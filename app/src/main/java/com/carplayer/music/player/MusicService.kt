@@ -140,6 +140,7 @@ class MusicService : MediaSessionService() {
             p.isPlaying,
             immediate
         )
+        PlaybackStore.saveMediaId(this, p.currentMediaItem?.mediaId)
     }
 
     /** Si el usuario cierra la app desde recientes, seguimos sonando salvo que este en pausa. */

@@ -5,6 +5,7 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.LinearGradient
 import android.graphics.Paint
+import android.graphics.Path
 import android.graphics.RectF
 import android.graphics.Shader
 import android.media.audiofx.Visualizer
@@ -40,6 +41,12 @@ class AudioVisualizerView @JvmOverloads constructor(
         private const val PEAK_FALL = 0.010f
         private const val SILENCE_TIMEOUT_MS = 1500L
 
+        /** Estilos de dibujo. El espectro es el mismo: cambia solo como se pinta. */
+        const val STYLE_BARS = 0
+        const val STYLE_WAVE = 1
+        const val STYLE_CIRCLE = 2
+        const val STYLE_COUNT = 3
+
         /** Paleta neon repartida a lo ancho: graves cian -> agudos violeta. */
         private val PALETTE = intArrayOf(
             0xFF22D3EE.toInt(),   // cian
@@ -63,6 +70,12 @@ class AudioVisualizerView @JvmOverloads constructor(
         color = Color.parseColor("#EAFDFF")
     }
     private val barRect = RectF()
+    private val wavePath = Path()
+    private var style = STYLE_BARS
+    private var cx = 0f
+    private var cy = 0f
+    private var baseRadius = 0f
+    private var maxRay = 0f
     private var barWidth = 0f
     private var gap = 0f
     private var corner = 0f
@@ -81,6 +94,23 @@ class AudioVisualizerView @JvmOverloads constructor(
     private var syntheticMode = false
     private val phase = FloatArray(BARS) { it * 0.7f }
     private var audioPlaying = false
+
+    /** Cambia el estilo de dibujo. Devuelve el estilo aplicado. */
+    fun setStyle(newStyle: Int): Int {
+        style = ((newStyle % STYLE_COUNT) + STYLE_COUNT) % STYLE_COUNT
+        if (style == STYLE_WAVE) {
+            barPaint.style = Paint.Style.STROKE
+            barPaint.strokeWidth = height * 0.045f
+            barPaint.strokeJoin = Paint.Join.ROUND
+            barPaint.strokeCap = Paint.Cap.ROUND
+        } else {
+            barPaint.style = Paint.Style.FILL
+        }
+        invalidate()
+        return style
+    }
+
+    fun currentStyle(): Int = style
 
     /** La Activity avisa si hay musica sonando (para el modo de respaldo). */
     fun setPlaying(playing: Boolean) {
@@ -273,6 +303,11 @@ class AudioVisualizerView @JvmOverloads constructor(
         gap = w * 0.012f
         barWidth = (w - gap * (BARS - 1)) / BARS
         corner = barWidth * 0.25f
+        cx = w / 2f
+        cy = h / 2f
+        baseRadius = kotlin.math.min(w, h) * 0.16f
+        maxRay = kotlin.math.min(w, h) * 0.32f
+        if (style == STYLE_WAVE) barPaint.strokeWidth = h * 0.045f
         // Un solo shader horizontal para las 24 barras: cada una toma el color que le
         // corresponde segun su posicion. Cuesta lo mismo que pintarlas de un color plano.
         barPaint.shader = LinearGradient(
@@ -283,6 +318,14 @@ class AudioVisualizerView @JvmOverloads constructor(
     }
 
     override fun onDraw(canvas: Canvas) {
+        when (style) {
+            STYLE_WAVE -> drawWave(canvas)
+            STYLE_CIRCLE -> drawCircle(canvas)
+            else -> drawBars(canvas)
+        }
+    }
+
+    private fun drawBars(canvas: Canvas) {
         val h = height.toFloat()
         val minH = h * 0.06f
         var x = 0f
@@ -299,6 +342,49 @@ class AudioVisualizerView @JvmOverloads constructor(
             }
             x += barWidth + gap
         }
+    }
+
+    /**
+     * Onda espejada: una linea gruesa que ondula sobre el centro y su reflejo abajo.
+     * Se reutiliza el mismo Path en cada cuadro (reset no reserva memoria nueva).
+     */
+    private fun drawWave(canvas: Canvas) {
+        val h = height.toFloat()
+        val w = width.toFloat()
+        val mid = h / 2f
+        val step = w / (BARS - 1)
+        val amp = h * 0.42f
+
+        for (side in 0..1) {
+            val dir = if (side == 0) -1f else 1f
+            wavePath.reset()
+            wavePath.moveTo(0f, mid + dir * current[0] * amp)
+            for (i in 1 until BARS) {
+                val px = i * step
+                val py = mid + dir * current[i] * amp
+                val prevX = (i - 1) * step
+                val prevY = mid + dir * current[i - 1] * amp
+                // Curva suave entre puntos: evita el aspecto de sierra
+                wavePath.quadTo(prevX, prevY, (prevX + px) / 2f, (prevY + py) / 2f)
+            }
+            wavePath.lineTo(w, mid + dir * current[BARS - 1] * amp)
+            canvas.drawPath(wavePath, barPaint)
+        }
+    }
+
+    /** Iris radial: las barras salen del centro como rayos y laten con la musica. */
+    private fun drawCircle(canvas: Canvas) {
+        val sweep = 360f / BARS
+        val thickness = baseRadius * 0.30f
+        canvas.save()
+        canvas.translate(cx, cy)
+        for (i in 0 until BARS) {
+            val len = baseRadius * 0.15f + current[i] * maxRay
+            barRect.set(-thickness / 2f, -(baseRadius + len), thickness / 2f, -baseRadius)
+            canvas.drawRoundRect(barRect, thickness / 2f, thickness / 2f, barPaint)
+            canvas.rotate(sweep)
+        }
+        canvas.restore()
     }
 
     // ------------------------------------------------------------------ Ciclo de vida

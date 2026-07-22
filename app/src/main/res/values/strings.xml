@@ -27,4 +27,13 @@
     <string name="from_cache">memoria</string>
     <string name="from_scan">USB</string>
     <string name="resuming">Retomando: %s</string>
+    <string name="search_title">Buscar</string>
+    <string name="search_hint">Nombre de cancion o carpeta</string>
+    <string name="search_go">Buscar</string>
+    <string name="search_results">"%1$s"  ·  %2$d resultados</string>
+    <string name="search_empty">Sin resultados</string>
+    <string name="restore_discarded">Se descarto la sesion anterior por un error</string>
+    <string name="style_bars">Estilo: Barras</string>
+    <string name="style_wave">Estilo: Onda</string>
+    <string name="style_circle">Estilo: Circulo</string>
 </resources>

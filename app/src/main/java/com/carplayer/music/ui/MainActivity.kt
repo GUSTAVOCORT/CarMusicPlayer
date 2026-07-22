@@ -9,6 +9,7 @@ import android.os.Handler
 import android.os.Looper
 import android.view.View
 import android.view.WindowManager
+import android.widget.EditText
 import android.widget.SeekBar
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
@@ -37,6 +38,7 @@ import com.carplayer.music.scanner.IndexCache
 import com.carplayer.music.scanner.MusicIndex
 import com.carplayer.music.scanner.Song
 import com.carplayer.music.scanner.UsbScanner
+import com.carplayer.music.view.AudioVisualizerView
 import com.google.common.util.concurrent.ListenableFuture
 import com.google.common.util.concurrent.MoreExecutors
 import kotlinx.coroutines.launch
@@ -47,7 +49,10 @@ import java.util.Locale
 class MainActivity : AppCompatActivity() {
 
     private companion object {
-        const val APP_VERSION = "v3.1"
+        const val APP_VERSION = "v4.0"
+        // El canal Binder entre pantalla y servicio revienta pasado ~1 MB por
+        // transaccion. 400 pistas entran holgadas: son casi 24 horas de musica.
+        const val MAX_QUEUE = 400
     }
 
     private lateinit var b: ActivityMainBinding
@@ -74,6 +79,9 @@ class MainActivity : AppCompatActivity() {
     private val setFull = ConstraintSet()
     private var setsReady = false
     private var screenMode = 0
+
+    /** Estamos mostrando resultados de busqueda en vez del explorador. */
+    private var searching = false
 
     /** Refresco de la barra de progreso: 2 veces por segundo alcanza y sobra. */
     private val progressTicker = object : Runnable {
@@ -117,9 +125,17 @@ class MainActivity : AppCompatActivity() {
         // Diagnostico: mantener presionado el ecualizador muestra si esta usando
         // datos de audio reales o el modo sintetico de respaldo.
         b.visualizer.setOnLongClickListener {
-            Toast.makeText(this, b.visualizer.debugInfo(), Toast.LENGTH_LONG).show()
+            val applied = b.visualizer.setStyle(b.visualizer.currentStyle() + 1)
+            PlaybackStore.setVisualStyle(this, applied)
+            val name = when (applied) {
+                AudioVisualizerView.STYLE_WAVE -> getString(R.string.style_wave)
+                AudioVisualizerView.STYLE_CIRCLE -> getString(R.string.style_circle)
+                else -> getString(R.string.style_bars)
+            }
+            Toast.makeText(this, name + "  ·  " + b.visualizer.debugInfo(), Toast.LENGTH_LONG).show()
             true
         }
+        b.visualizer.setStyle(PlaybackStore.visualStyle(this))
 
         wireControls()
         requestPermissions()
@@ -241,6 +257,7 @@ class MainActivity : AppCompatActivity() {
     override fun onBackPressed() {
         when {
             screenMode != 0 -> applyScreenMode(0, announce = false)
+            searching -> showRoot()
             currentFolder != null -> showRoot()
             else -> super.onBackPressed()
         }
@@ -308,6 +325,15 @@ class MainActivity : AppCompatActivity() {
         }
         if (MusicIndex.all.isEmpty()) return
 
+        // Cortacircuitos: si la restauracion anterior quedo a medias, fue porque
+        // mato el proceso. Se descarta el estado y se arranca limpio.
+        if (PlaybackStore.restorePending(this)) {
+            PlaybackStore.forget(this)
+            restored = true
+            Toast.makeText(this, R.string.restore_discarded, Toast.LENGTH_LONG).show()
+            return
+        }
+
         val source = PlaybackStore.source(this) ?: return
         val songs = if (source == PlaybackStore.SOURCE_ALL) {
             MusicIndex.all
@@ -317,8 +343,15 @@ class MainActivity : AppCompatActivity() {
         if (songs.isEmpty()) return
 
         restored = true
-        val index = PlaybackStore.index(this).coerceIn(0, songs.size - 1)
+        PlaybackStore.beginRestore(this)
+
+        // Se busca por ruta y no por numero de posicion: si la cola se arma
+        // distinta, el numero apuntaria a otra cancion.
+        val savedPath = PlaybackStore.mediaId(this)
+        val byPath = if (savedPath != null) songs.indexOfFirst { it.path == savedPath } else -1
+        val index = if (byPath >= 0) byPath else PlaybackStore.index(this).coerceIn(0, songs.size - 1)
         val pos = PlaybackStore.position(this)
+
         Toast.makeText(
             this,
             getString(R.string.resuming, songs[index].title),
@@ -334,12 +367,15 @@ class MainActivity : AppCompatActivity() {
             rememberSource = false
         )
         if (source != PlaybackStore.SOURCE_ALL) showFolder(source)
+
+        PlaybackStore.endRestore(this)
     }
 
     // ------------------------------------------------------------------ Navegacion
 
     private fun showRoot() {
         currentFolder = null
+        searching = false
         b.txtFolder.text = getString(R.string.all_folders)
         val items = MusicIndex.byFolder.entries
             .sortedBy { it.key }
@@ -351,6 +387,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun showFolder(path: String) {
         currentFolder = path
+        searching = false
         b.txtFolder.text = File(path).name
         val idx = MusicIndex.byFolder[path] ?: IntArray(0)
         val all = MusicIndex.all
@@ -367,8 +404,11 @@ class MainActivity : AppCompatActivity() {
             is BrowserItem.UpDir -> showRoot()
             is BrowserItem.Folder -> showFolder(item.path)
             is BrowserItem.Track -> {
-                val folder = currentFolder ?: return
-                playQueue(folderSongs(folder), item.indexInQueue, false, folder)
+                // Sirve igual desde el explorador y desde los resultados de busqueda
+                val folder = item.song.folderPath
+                val songs = folderSongs(folder)
+                val idx = songs.indexOfFirst { it.path == item.song.path }.coerceAtLeast(0)
+                playQueue(songs, idx, false, folder)
             }
         }
     }
@@ -402,8 +442,18 @@ class MainActivity : AppCompatActivity() {
         val c = controller ?: return
         if (songs.isEmpty()) return
 
-        val items = ArrayList<MediaItem>(songs.size)
-        for (s in songs) {
+        // Recorte de seguridad: nunca se manda una cola gigante por Binder.
+        // Se toma una ventana alrededor de la cancion inicial.
+        var list = songs
+        var index = startIndex.coerceIn(0, songs.size - 1)
+        if (songs.size > MAX_QUEUE) {
+            val from = (index - MAX_QUEUE / 4).coerceIn(0, songs.size - MAX_QUEUE)
+            list = songs.subList(from, from + MAX_QUEUE)
+            index -= from
+        }
+
+        val items = ArrayList<MediaItem>(list.size)
+        for (s in list) {
             items.add(
                 MediaItem.Builder()
                     .setMediaId(s.path)
@@ -423,7 +473,7 @@ class MainActivity : AppCompatActivity() {
 
         c.shuffleModeEnabled = shuffle
         c.repeatMode = Player.REPEAT_MODE_ALL
-        c.setMediaItems(items, startIndex, startPositionMs)
+        c.setMediaItems(items, index, startPositionMs)
         c.prepare()
         if (autoPlay) c.play()
         syncUi(c)
@@ -466,6 +516,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         b.btnEq.setOnClickListener { showEqDialog() }
+        b.btnSearch.setOnClickListener { showSearchDialog() }
 
         b.seekBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(sb: SeekBar, progress: Int, fromUser: Boolean) {
@@ -481,6 +532,65 @@ class MainActivity : AppCompatActivity() {
                 controller?.seekTo(sb.progress.toLong())
             }
         })
+    }
+
+    // ------------------------------------------------------------------ Buscador
+
+    private fun showSearchDialog() {
+        val input = EditText(this).apply {
+            hint = getString(R.string.search_hint)
+            setSingleLine()
+            setPadding(40, 30, 40, 30)
+            setTextColor(ContextCompat.getColor(context, R.color.text_primary))
+            textSize = 20f
+        }
+        AlertDialog.Builder(this)
+            .setTitle(R.string.search_title)
+            .setView(input)
+            .setPositiveButton(R.string.search_go) { _, _ ->
+                runSearch(input.text.toString().trim())
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    /**
+     * Filtrado directo sobre el indice que ya esta en memoria.
+     * Con 3.000 pistas son 3.000 comparaciones de texto: menos de 20 ms en el T3,
+     * asi que no hace falta base de datos ni indice invertido.
+     */
+    private fun runSearch(query: String) {
+        if (query.isEmpty()) {
+            showRoot()
+            return
+        }
+        val q = query.lowercase()
+        val results = ArrayList<BrowserItem>(64)
+
+        // Primero las carpetas que coinciden, despues las canciones
+        MusicIndex.byFolder.entries
+            .filter { File(it.key).name.lowercase().contains(q) }
+            .sortedBy { it.key }
+            .forEach { (path, idx) ->
+                results.add(BrowserItem.Folder(path, File(path).name.ifBlank { path }, idx.size))
+            }
+
+        var count = 0
+        for (song in MusicIndex.all) {
+            if (count >= 300) break     // techo sano: nadie recorre mas de 300 en un auto
+            if (song.title.lowercase().contains(q) || song.artist.lowercase().contains(q)) {
+                results.add(BrowserItem.Track(song, count))
+                count++
+            }
+        }
+
+        searching = true
+        currentFolder = null
+        b.txtFolder.text = getString(R.string.search_results, query, results.size)
+        adapter.submitList(results)
+        if (results.isEmpty()) {
+            Toast.makeText(this, R.string.search_empty, Toast.LENGTH_SHORT).show()
+        }
     }
 
     // ------------------------------------------------------------------ Ecualizador

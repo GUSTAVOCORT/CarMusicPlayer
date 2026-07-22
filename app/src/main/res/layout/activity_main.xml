@@ -178,6 +178,17 @@
         app:layout_constraintTop_toTopOf="parent" />
 
     <ImageButton
+        android:id="@+id/btnSearch"
+        style="@style/CarButton"
+        android:layout_width="64dp"
+        android:layout_height="64dp"
+        android:layout_marginEnd="8dp"
+        android:contentDescription="@string/search_title"
+        android:src="@drawable/ic_search"
+        app:layout_constraintEnd_toStartOf="@id/btnEq"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <ImageButton
         android:id="@+id/btnEq"
         style="@style/CarButton"
         android:layout_width="64dp"
@@ -199,7 +210,7 @@
         android:textSize="20sp"
         android:textStyle="bold"
         app:layout_constraintBottom_toBottomOf="@id/btnBrowse"
-        app:layout_constraintEnd_toStartOf="@id/btnEq"
+        app:layout_constraintEnd_toStartOf="@id/btnSearch"
         app:layout_constraintStart_toEndOf="@id/btnBrowse"
         app:layout_constraintTop_toTopOf="@id/btnBrowse"
         tools:text="/USB/Rock" />

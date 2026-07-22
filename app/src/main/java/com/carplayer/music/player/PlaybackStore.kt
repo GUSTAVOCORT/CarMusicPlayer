@@ -18,6 +18,9 @@ object PlaybackStore {
     private const val K_SHUFFLE = "shuffle"
     private const val K_EQ = "eq_preset"
     private const val K_MODE = "screen_mode"
+    private const val K_MEDIA_ID = "media_id"
+    private const val K_RESTORE_PENDING = "restore_pending"
+    private const val K_VIS_STYLE = "vis_style"
 
     const val SOURCE_ALL = "ALL"
 
@@ -50,6 +53,49 @@ object PlaybackStore {
             .putLong(K_POSITION, positionMs)
             .putBoolean(K_PLAYING, playing)
         if (immediate) e.commit() else e.apply()
+    }
+
+    /** Ruta exacta de la cancion: sobrevive aunque la cola se arme distinta. */
+    fun mediaId(c: Context): String? = prefs(c).getString(K_MEDIA_ID, null)
+
+    fun saveMediaId(c: Context, path: String?) {
+        prefs(c).edit().putString(K_MEDIA_ID, path).apply()
+    }
+
+    /**
+     * Cortacircuitos anti-bucle.
+     *
+     * Se marca una bandera ANTES de restaurar y se borra cuando termino bien.
+     * Si al abrir la app la bandera sigue puesta, el intento anterior mato el
+     * proceso: se descarta el estado y se arranca limpio en vez de morir
+     * una y otra vez. Evita tener que borrar datos a mano.
+     */
+    fun restorePending(c: Context): Boolean = prefs(c).getBoolean(K_RESTORE_PENDING, false)
+
+    fun beginRestore(c: Context) {
+        prefs(c).edit().putBoolean(K_RESTORE_PENDING, true).commit()
+    }
+
+    fun endRestore(c: Context) {
+        prefs(c).edit().putBoolean(K_RESTORE_PENDING, false).commit()
+    }
+
+    fun forget(c: Context) {
+        prefs(c).edit()
+            .remove(K_SOURCE)
+            .remove(K_MEDIA_ID)
+            .remove(K_INDEX)
+            .remove(K_POSITION)
+            .remove(K_PLAYING)
+            .putBoolean(K_RESTORE_PENDING, false)
+            .commit()
+    }
+
+    /** Estilo del visualizador: 0 barras, 1 onda, 2 circulo. */
+    fun visualStyle(c: Context): Int = prefs(c).getInt(K_VIS_STYLE, 0)
+
+    fun setVisualStyle(c: Context, style: Int) {
+        prefs(c).edit().putInt(K_VIS_STYLE, style).apply()
     }
 
     fun source(c: Context): String? = prefs(c).getString(K_SOURCE, null)

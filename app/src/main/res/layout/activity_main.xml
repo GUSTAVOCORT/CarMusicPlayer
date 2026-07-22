@@ -22,44 +22,78 @@
         android:id="@+id/txtTitle"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:maxLines="1"
         android:ellipsize="marquee"
-        android:marqueeRepeatLimit="marquee_forever"
-        android:singleLine="true"
         android:focusable="true"
         android:focusableInTouchMode="true"
+        android:marqueeRepeatLimit="marquee_forever"
+        android:singleLine="true"
         android:textColor="@color/text_primary"
         android:textSize="26sp"
         android:textStyle="bold"
-        tools:text="Nombre de la cancion"
         app:layout_constraintEnd_toStartOf="@id/gl_split"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent" />
+        app:layout_constraintTop_toTopOf="parent"
+        tools:text="Nombre de la cancion" />
 
     <TextView
         android:id="@+id/txtSubtitle"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_marginTop="2dp"
-        android:maxLines="1"
         android:ellipsize="end"
+        android:maxLines="1"
         android:textColor="@color/accent"
         android:textSize="16sp"
-        tools:text="Carpeta / Artista"
         app:layout_constraintEnd_toStartOf="@id/gl_split"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/txtTitle" />
+        app:layout_constraintTop_toBottomOf="@id/txtTitle"
+        tools:text="Carpeta / Artista" />
+
+    <!-- Barra de progreso: alta y con pulgar grande para poder tocarla manejando -->
+    <SeekBar
+        android:id="@+id/seekBar"
+        android:layout_width="0dp"
+        android:layout_height="44dp"
+        android:layout_marginTop="6dp"
+        android:maxHeight="6dp"
+        android:minHeight="6dp"
+        android:progressTint="@color/accent"
+        android:progressBackgroundTint="@color/panel_alt"
+        android:thumbTint="@color/accent"
+        app:layout_constraintEnd_toStartOf="@id/gl_split"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/txtSubtitle" />
+
+    <TextView
+        android:id="@+id/txtPosition"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="0:00"
+        android:textColor="@color/text_secondary"
+        android:textSize="14sp"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/seekBar" />
+
+    <TextView
+        android:id="@+id/txtDuration"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="0:00"
+        android:textColor="@color/text_secondary"
+        android:textSize="14sp"
+        app:layout_constraintEnd_toStartOf="@id/gl_split"
+        app:layout_constraintTop_toBottomOf="@id/seekBar" />
 
     <com.carplayer.music.view.AudioVisualizerView
         android:id="@+id/visualizer"
         android:layout_width="0dp"
         android:layout_height="0dp"
-        android:layout_marginTop="14dp"
-        android:layout_marginBottom="14dp"
+        android:layout_marginTop="10dp"
+        android:layout_marginBottom="12dp"
         app:layout_constraintBottom_toTopOf="@id/btnPlay"
         app:layout_constraintEnd_toStartOf="@id/gl_split"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/txtSubtitle" />
+        app:layout_constraintTop_toBottomOf="@id/txtPosition" />
 
     <!-- Controles grandes: 72dp, por encima del minimo de 64dp -->
 
@@ -141,6 +175,17 @@
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
 
+    <ImageButton
+        android:id="@+id/btnEq"
+        style="@style/CarButton"
+        android:layout_width="64dp"
+        android:layout_height="64dp"
+        android:layout_marginEnd="8dp"
+        android:contentDescription="@string/eq_title"
+        android:src="@drawable/ic_equalizer"
+        app:layout_constraintEnd_toStartOf="@id/btnRescan"
+        app:layout_constraintTop_toTopOf="parent" />
+
     <TextView
         android:id="@+id/txtFolder"
         android:layout_width="0dp"
@@ -151,11 +196,11 @@
         android:textColor="@color/text_primary"
         android:textSize="20sp"
         android:textStyle="bold"
-        tools:text="/USB/Rock"
         app:layout_constraintBottom_toBottomOf="@id/btnBrowse"
-        app:layout_constraintEnd_toStartOf="@id/btnRescan"
+        app:layout_constraintEnd_toStartOf="@id/btnEq"
         app:layout_constraintStart_toEndOf="@id/btnBrowse"
-        app:layout_constraintTop_toTopOf="@id/btnBrowse" />
+        app:layout_constraintTop_toTopOf="@id/btnBrowse"
+        tools:text="/USB/Rock" />
 
     <TextView
         android:id="@+id/txtStatus"
@@ -165,10 +210,10 @@
         android:layout_marginTop="4dp"
         android:textColor="@color/text_secondary"
         android:textSize="13sp"
-        tools:text="1.248 pistas en 37 carpetas"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="@id/gl_split"
-        app:layout_constraintTop_toBottomOf="@id/btnBrowse" />
+        app:layout_constraintTop_toBottomOf="@id/btnBrowse"
+        tools:text="1248 pistas en 37 carpetas" />
 
     <ProgressBar
         android:id="@+id/progress"

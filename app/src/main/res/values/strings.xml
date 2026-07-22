@@ -15,4 +15,9 @@
     <string name="no_permission">Sin permiso de almacenamiento</string>
     <string name="found_tracks">%1$d pistas en %2$d carpetas</string>
     <string name="tracks_count">%d pistas</string>
+    <string name="eq_title">Ecualizador</string>
+    <string name="eq_flat">Plano</string>
+    <string name="eq_bass">Graves reforzados</string>
+    <string name="eq_voice">Voz / Podcast</string>
+    <string name="eq_rock">Rock</string>
 </resources>

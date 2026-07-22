@@ -1,13 +1,18 @@
 package com.carplayer.music.player
 
 import android.app.PendingIntent
+import android.content.Context
 import android.content.Intent
+import android.media.AudioManager
+import android.os.Handler
+import android.os.Looper
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.common.Player
 import androidx.media3.exoplayer.analytics.AnalyticsListener
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
@@ -23,6 +28,15 @@ import com.carplayer.music.ui.MainActivity
 class MusicService : MediaSessionService() {
 
     private var mediaSession: MediaSession? = null
+    private val handler = Handler(Looper.getMainLooper())
+
+    /** Guarda la posicion cada 5 s para poder retomar al encender el auto. */
+    private val saveTicker = object : Runnable {
+        override fun run() {
+            saveState()
+            handler.postDelayed(this, 5_000)
+        }
+    }
 
     override fun onCreate() {
         super.onCreate()
@@ -63,8 +77,9 @@ class MusicService : MediaSessionService() {
                 eventTime: AnalyticsListener.EventTime,
                 audioSessionId: Int
             ) {
-                // El visualizador de la UI se engancha a este id.
+                // El visualizador de la UI y el ecualizador se enganchan a este id.
                 PlayerBus.audioSessionId.value = audioSessionId
+                AudioFx.attach(this@MusicService, audioSessionId)
             }
         })
 
@@ -75,6 +90,37 @@ class MusicService : MediaSessionService() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
+        player.addListener(object : Player.Listener {
+            override fun onIsPlayingChanged(isPlaying: Boolean) {
+                saveState()
+                if (isPlaying) {
+                    handler.removeCallbacks(saveTicker)
+                    handler.postDelayed(saveTicker, 5_000)
+                } else {
+                    handler.removeCallbacks(saveTicker)
+                }
+            }
+
+            override fun onMediaItemTransition(mediaItem: androidx.media3.common.MediaItem?, reason: Int) {
+                saveState()
+            }
+        })
+
+        // IMPORTANTE: en vez de esperar el evento onAudioSessionIdChanged (que en varios
+        // equipos no llega nunca), generamos el id nosotros y se lo imponemos al player.
+        // Asi el visualizador y el ecualizador tienen un id valido desde el segundo cero.
+        try {
+            val am = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+            val forcedId = am.generateAudioSessionId()
+            if (forcedId != AudioManager.ERROR) {
+                player.audioSessionId = forcedId
+                PlayerBus.audioSessionId.value = forcedId
+                AudioFx.attach(this, forcedId)
+            }
+        } catch (e: Exception) {
+            android.util.Log.w("MusicService", "No se pudo fijar el audioSessionId: " + e.message)
+        }
+
         mediaSession = MediaSession.Builder(this, player)
             .setId("car_player_session")
             .setSessionActivity(openUi)
@@ -84,8 +130,20 @@ class MusicService : MediaSessionService() {
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? =
         mediaSession
 
+    private fun saveState() {
+        val p = mediaSession?.player ?: return
+        if (p.mediaItemCount == 0) return
+        PlaybackStore.savePosition(
+            this,
+            p.currentMediaItemIndex,
+            p.currentPosition.coerceAtLeast(0L),
+            p.isPlaying
+        )
+    }
+
     /** Si el usuario cierra la app desde recientes, seguimos sonando salvo que este en pausa. */
     override fun onTaskRemoved(rootIntent: Intent?) {
+        saveState()
         val player = mediaSession?.player ?: return stopSelf()
         if (!player.playWhenReady || player.mediaItemCount == 0) {
             stopSelf()
@@ -93,6 +151,9 @@ class MusicService : MediaSessionService() {
     }
 
     override fun onDestroy() {
+        saveState()
+        handler.removeCallbacks(saveTicker)
+        AudioFx.release()
         mediaSession?.run {
             player.release()
             release()

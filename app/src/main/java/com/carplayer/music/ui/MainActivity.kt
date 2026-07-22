@@ -14,6 +14,7 @@ import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.constraintlayout.widget.ConstraintSet
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
@@ -62,6 +63,14 @@ class MainActivity : AppCompatActivity() {
 
     private val ui = Handler(Looper.getMainLooper())
 
+    // --- Modos de pantalla ---
+    // 0 normal | 1 sin lista (visualizador ancho) | 2 pantalla completa
+    private val setNormal = ConstraintSet()
+    private val setWide = ConstraintSet()
+    private val setFull = ConstraintSet()
+    private var setsReady = false
+    private var screenMode = 0
+
     /** Refresco de la barra de progreso: 2 veces por segundo alcanza y sobra. */
     private val progressTicker = object : Runnable {
         override fun run() {
@@ -95,6 +104,9 @@ class MainActivity : AppCompatActivity() {
         b.recycler.setItemViewCacheSize(12)
         b.recycler.itemAnimator = null
 
+        // Un toque sobre el ecualizador cambia de modo de pantalla.
+        b.visualizer.setOnClickListener { cycleScreenMode() }
+
         // Diagnostico: mantener presionado el ecualizador muestra si esta usando
         // datos de audio reales o el modo sintetico de respaldo.
         b.visualizer.setOnLongClickListener {
@@ -104,6 +116,68 @@ class MainActivity : AppCompatActivity() {
 
         wireControls()
         requestPermissions()
+
+        // Los ConstraintSet se capturan cuando la vista ya esta medida
+        b.root.post {
+            buildConstraintSets()
+            applyScreenMode(PlaybackStore.screenMode(this), announce = false)
+        }
+    }
+
+    // ------------------------------------------------------------------ Modos de pantalla
+
+    private fun buildConstraintSets() {
+        if (setsReady) return
+        setNormal.clone(b.root)
+
+        // Modo "sin lista": la guia se corre al 100 % y el panel derecho desaparece,
+        // asi el visualizador ocupa todo el ancho.
+        setWide.clone(b.root)
+        setWide.setGuidelinePercent(R.id.gl_split, 1f)
+        intArrayOf(
+            R.id.btnBrowse, R.id.btnEq, R.id.btnRescan,
+            R.id.txtFolder, R.id.txtStatus, R.id.progress, R.id.recycler
+        ).forEach { setWide.setVisibility(it, ConstraintSet.GONE) }
+
+        // Modo "pantalla completa": solo el visualizador, de borde a borde.
+        setFull.clone(setWide)
+        intArrayOf(
+            R.id.txtTitle, R.id.txtSubtitle, R.id.seekBar,
+            R.id.txtPosition, R.id.txtDuration,
+            R.id.btnPlay, R.id.btnPrev, R.id.btnNext,
+            R.id.btnShuffleAll, R.id.btnShuffleFolder
+        ).forEach { setFull.setVisibility(it, ConstraintSet.GONE) }
+        setFull.connect(R.id.visualizer, ConstraintSet.TOP, ConstraintSet.PARENT_ID, ConstraintSet.TOP, 0)
+        setFull.connect(R.id.visualizer, ConstraintSet.BOTTOM, ConstraintSet.PARENT_ID, ConstraintSet.BOTTOM, 0)
+        setFull.connect(R.id.visualizer, ConstraintSet.START, ConstraintSet.PARENT_ID, ConstraintSet.START, 0)
+        setFull.connect(R.id.visualizer, ConstraintSet.END, ConstraintSet.PARENT_ID, ConstraintSet.END, 0)
+
+        setsReady = true
+    }
+
+    private fun cycleScreenMode() {
+        applyScreenMode((screenMode + 1) % 3, announce = true)
+    }
+
+    private fun applyScreenMode(mode: Int, announce: Boolean) {
+        if (!setsReady) return
+        screenMode = mode
+        // applyTo directo, sin TransitionManager: una animacion de layout en el T3
+        // costaria mas que todo el resto de la pantalla junta.
+        when (mode) {
+            1 -> setWide.applyTo(b.root)
+            2 -> setFull.applyTo(b.root)
+            else -> setNormal.applyTo(b.root)
+        }
+        PlaybackStore.setScreenMode(this, mode)
+        if (announce) {
+            val name = when (mode) {
+                1 -> R.string.mode_wide
+                2 -> R.string.mode_full
+                else -> R.string.mode_normal
+            }
+            Toast.makeText(this, name, Toast.LENGTH_SHORT).show()
+        }
     }
 
     override fun onStart() {
@@ -146,7 +220,11 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onBackPressed() {
-        if (currentFolder != null) showRoot() else super.onBackPressed()
+        when {
+            screenMode != 0 -> applyScreenMode(0, announce = false)
+            currentFolder != null -> showRoot()
+            else -> super.onBackPressed()
+        }
     }
 
     // ------------------------------------------------------------------ Permisos

@@ -17,6 +17,7 @@ object PlaybackStore {
     private const val K_PLAYING = "was_playing"
     private const val K_SHUFFLE = "shuffle"
     private const val K_EQ = "eq_preset"
+    private const val K_MODE = "screen_mode"
 
     const val SOURCE_ALL = "ALL"
 
@@ -44,6 +45,12 @@ object PlaybackStore {
     fun position(c: Context): Long = prefs(c).getLong(K_POSITION, 0L)
     fun wasPlaying(c: Context): Boolean = prefs(c).getBoolean(K_PLAYING, false)
     fun shuffle(c: Context): Boolean = prefs(c).getBoolean(K_SHUFFLE, false)
+
+    /** 0 = normal, 1 = sin lista, 2 = pantalla completa */
+    fun screenMode(c: Context): Int = prefs(c).getInt(K_MODE, 0)
+    fun setScreenMode(c: Context, mode: Int) {
+        prefs(c).edit().putInt(K_MODE, mode).apply()
+    }
 
     fun eqPreset(c: Context): Int = prefs(c).getInt(K_EQ, 0)
     fun setEqPreset(c: Context, preset: Int) {

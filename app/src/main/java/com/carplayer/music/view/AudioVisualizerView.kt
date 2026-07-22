@@ -115,6 +115,7 @@ class AudioVisualizerView @JvmOverloads constructor(
         }
         if (visualizer == null) {
             Log.w(TAG, "Sin visualizador real, se usara el modo sintetico. $lastError")
+            syntheticMode = true
         }
         start()
     }
@@ -283,7 +284,7 @@ class AudioVisualizerView @JvmOverloads constructor(
 
     override fun onDraw(canvas: Canvas) {
         val h = height.toFloat()
-        val minH = h * 0.02f
+        val minH = h * 0.06f
         var x = 0f
         for (i in 0 until BARS) {
             val bh = max(minH, current[i] * h)

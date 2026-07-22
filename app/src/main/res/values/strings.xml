@@ -20,4 +20,7 @@
     <string name="eq_bass">Graves reforzados</string>
     <string name="eq_voice">Voz / Podcast</string>
     <string name="eq_rock">Rock</string>
+    <string name="mode_normal">Vista normal</string>
+    <string name="mode_wide">Sin lista</string>
+    <string name="mode_full">Pantalla completa</string>
 </resources>

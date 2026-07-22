@@ -72,6 +72,9 @@ class AudioVisualizerView @JvmOverloads constructor(
     private val barRect = RectF()
     private val wavePath = Path()
     private var style = STYLE_BARS
+    private var palette = PALETTE
+    private var reactive = 0
+    private val reactiveColors = IntArray(BARS)   // color por barra, recalculado por cuadro
     private var cx = 0f
     private var cy = 0f
     private var baseRadius = 0f
@@ -94,6 +97,75 @@ class AudioVisualizerView @JvmOverloads constructor(
     private var syntheticMode = false
     private val phase = FloatArray(BARS) { it * 0.7f }
     private var audioPlaying = false
+
+    /**
+     * Cambia la paleta del visualizador.
+     * [reactiveMode]: 0 degradado fijo, 1 late con la intensidad, 2 termometro.
+     */
+    fun setPalette(colors: IntArray, reactiveMode: Int = 0) {
+        if (colors.size < 2) return
+        palette = colors
+        reactive = reactiveMode
+        rebuildShader()
+        invalidate()
+    }
+
+    /** Mezcla lineal entre dos colores ARGB. t va de 0 a 1. */
+    private fun lerpColor(c1: Int, c2: Int, t: Float): Int {
+        val u = t.coerceIn(0f, 1f)
+        val a = ((c1 ushr 24) + (((c2 ushr 24) - (c1 ushr 24)) * u)).toInt()
+        val r = (((c1 shr 16) and 0xFF) + ((((c2 shr 16) and 0xFF) - ((c1 shr 16) and 0xFF)) * u)).toInt()
+        val g = (((c1 shr 8) and 0xFF) + ((((c2 shr 8) and 0xFF) - ((c1 shr 8) and 0xFF)) * u)).toInt()
+        val b = ((c1 and 0xFF) + (((c2 and 0xFF) - (c1 and 0xFF)) * u)).toInt()
+        return (a shl 24) or (r shl 16) or (g shl 8) or b
+    }
+
+    /** Color de una rampa de N colores en la posicion t (0..1). */
+    private fun sampleRamp(ramp: IntArray, t: Float): Int {
+        if (ramp.size == 1) return ramp[0]
+        val x = (t.coerceIn(0f, 1f)) * (ramp.size - 1)
+        val i = x.toInt().coerceIn(0, ramp.size - 2)
+        return lerpColor(ramp[i], ramp[i + 1], x - i)
+    }
+
+    /**
+     * Un solo shader horizontal para las 24 barras: cada una toma el color que le
+     * corresponde segun su posicion. Cuesta lo mismo que pintarlas de un color plano.
+     */
+    private fun rebuildShader() {
+        if (width == 0) return
+        if (reactive != 0) {
+            // En modo reactivo el color lo pone cada barra: sin shader global.
+            barPaint.shader = null
+            return
+        }
+        barPaint.shader = LinearGradient(
+            0f, 0f, width.toFloat(), 0f,
+            palette, null,
+            Shader.TileMode.CLAMP
+        )
+    }
+
+    /** Recalcula el color de cada barra segun el modo reactivo activo. */
+    private fun computeReactiveColors() {
+        when (reactive) {
+            1 -> {
+                // Late con la intensidad: promedio del espectro -> punto en la rampa,
+                // el mismo color para todas las barras en ese cuadro.
+                var sum = 0f
+                for (i in 0 until BARS) sum += current[i]
+                val energy = (sum / BARS) * 1.8f
+                val col = sampleRamp(palette, energy)
+                for (i in 0 until BARS) reactiveColors[i] = col
+            }
+            2 -> {
+                // Termometro: cada barra toma su color segun su propia altura.
+                for (i in 0 until BARS) {
+                    reactiveColors[i] = sampleRamp(palette, current[i])
+                }
+            }
+        }
+    }
 
     /** Cambia el estilo de dibujo. Devuelve el estilo aplicado. */
     fun setStyle(newStyle: Int): Int {
@@ -308,16 +380,11 @@ class AudioVisualizerView @JvmOverloads constructor(
         baseRadius = kotlin.math.min(w, h) * 0.16f
         maxRay = kotlin.math.min(w, h) * 0.32f
         if (style == STYLE_WAVE) barPaint.strokeWidth = h * 0.045f
-        // Un solo shader horizontal para las 24 barras: cada una toma el color que le
-        // corresponde segun su posicion. Cuesta lo mismo que pintarlas de un color plano.
-        barPaint.shader = LinearGradient(
-            0f, 0f, w.toFloat(), 0f,
-            PALETTE, null,
-            Shader.TileMode.CLAMP
-        )
+        rebuildShader()
     }
 
     override fun onDraw(canvas: Canvas) {
+        if (reactive != 0) computeReactiveColors()
         when (style) {
             STYLE_WAVE -> drawWave(canvas)
             STYLE_CIRCLE -> drawCircle(canvas)
@@ -330,6 +397,7 @@ class AudioVisualizerView @JvmOverloads constructor(
         val minH = h * 0.06f
         var x = 0f
         for (i in 0 until BARS) {
+            if (reactive != 0) barPaint.color = reactiveColors[i]
             val bh = max(minH, current[i] * h)
             barRect.set(x, h - bh, x + barWidth, h)
             canvas.drawRoundRect(barRect, corner, corner, barPaint)
@@ -355,6 +423,7 @@ class AudioVisualizerView @JvmOverloads constructor(
         val step = w / (BARS - 1)
         val amp = h * 0.42f
 
+        if (reactive != 0) barPaint.color = reactiveColors[BARS / 2]
         for (side in 0..1) {
             val dir = if (side == 0) -1f else 1f
             wavePath.reset()
@@ -379,6 +448,7 @@ class AudioVisualizerView @JvmOverloads constructor(
         canvas.save()
         canvas.translate(cx, cy)
         for (i in 0 until BARS) {
+            if (reactive != 0) barPaint.color = reactiveColors[i]
             val len = baseRadius * 0.15f + current[i] * maxRay
             barRect.set(-thickness / 2f, -(baseRadius + len), thickness / 2f, -baseRadius)
             canvas.drawRoundRect(barRect, thickness / 2f, thickness / 2f, barPaint)

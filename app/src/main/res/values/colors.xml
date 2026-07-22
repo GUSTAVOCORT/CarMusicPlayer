@@ -7,4 +7,6 @@
     <color name="accent_dim">#0E7490</color>
     <color name="text_primary">#F2F5F7</color>
     <color name="text_secondary">#8A93A0</color>
+    <color name="track">#3A404D</color>
+    <color name="text_time">#C8CFDA</color>
 </resources>

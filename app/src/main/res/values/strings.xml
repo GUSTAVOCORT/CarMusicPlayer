@@ -36,4 +36,5 @@
     <string name="style_bars">Estilo: Barras</string>
     <string name="style_wave">Estilo: Onda</string>
     <string name="style_circle">Estilo: Circulo</string>
+    <string name="palette_title">Colores de la pantalla</string>
 </resources>

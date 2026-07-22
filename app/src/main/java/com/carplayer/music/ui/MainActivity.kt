@@ -3,6 +3,9 @@ package com.carplayer.music.ui
 import android.Manifest
 import android.content.ComponentName
 import android.content.pm.PackageManager
+import android.content.res.ColorStateList
+import android.graphics.PorterDuff
+import android.graphics.drawable.GradientDrawable
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
@@ -49,7 +52,7 @@ import java.util.Locale
 class MainActivity : AppCompatActivity() {
 
     private companion object {
-        const val APP_VERSION = "v4.0"
+        const val APP_VERSION = "v4.2"
         // El canal Binder entre pantalla y servicio revienta pasado ~1 MB por
         // transaccion. 400 pistas entran holgadas: son casi 24 horas de musica.
         const val MAX_QUEUE = 400
@@ -136,6 +139,8 @@ class MainActivity : AppCompatActivity() {
             true
         }
         b.visualizer.setStyle(PlaybackStore.visualStyle(this))
+
+        applyPalette(PlaybackStore.palette(this))
 
         wireControls()
         requestPermissions()
@@ -516,6 +521,10 @@ class MainActivity : AppCompatActivity() {
         }
 
         b.btnEq.setOnClickListener { showEqDialog() }
+        b.btnEq.setOnLongClickListener {
+            showPaletteDialog()
+            true
+        }
         b.btnSearch.setOnClickListener { showSearchDialog() }
 
         b.seekBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
@@ -610,6 +619,60 @@ class MainActivity : AppCompatActivity() {
             }
             .setNegativeButton(android.R.string.cancel, null)
             .show()
+    }
+
+    // ------------------------------------------------------------------ Colores
+
+    private fun showPaletteDialog() {
+        AlertDialog.Builder(this)
+            .setTitle(R.string.palette_title)
+            .setSingleChoiceItems(Palettes.names(), PlaybackStore.palette(this)) { dialog, which ->
+                PlaybackStore.setPalette(this, which)
+                applyPalette(which)
+                dialog.dismiss()
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    /**
+     * Pinta la interfaz por codigo en vez de recrear la Activity con otro tema:
+     * un recreate() obliga a volver a inflar todo el layout y en el T3 se nota.
+     */
+    private fun applyPalette(index: Int) {
+        val p = Palettes.get(index)
+        val accent = p.accent
+        val tint = ColorStateList.valueOf(accent)
+
+        // Iconos
+        listOf(
+            b.btnPlay, b.btnPrev, b.btnNext,
+            b.btnBrowse, b.btnEq, b.btnRescan, b.btnSearch
+        ).forEach { it.setColorFilter(accent, PorterDuff.Mode.SRC_IN) }
+
+        // Iconos de los botones de mezclar (van como drawable del texto)
+        listOf(b.btnShuffleAll, b.btnShuffleFolder).forEach { btn ->
+            btn.compoundDrawables.filterNotNull().forEach {
+                it.setColorFilter(accent, PorterDuff.Mode.SRC_IN)
+            }
+        }
+
+        // Aro del boton principal, construido a mano para poder recolorear el borde
+        b.btnPlay.background = GradientDrawable().apply {
+            shape = GradientDrawable.OVAL
+            setColor(0xFF10151A.toInt())
+            setStroke((3 * resources.displayMetrics.density).toInt(), accent)
+        }
+
+        // Barra de progreso: riel bien visible sobre el fondo negro
+        b.seekBar.progressTintList = tint
+        b.seekBar.thumbTintList = tint
+        b.seekBar.progressBackgroundTintList = ColorStateList.valueOf(0xFF3A404D.toInt())
+
+        b.txtSubtitle.setTextColor(accent)
+        b.progress.indeterminateTintList = tint
+
+        b.visualizer.setPalette(p.bars, p.reactive)
     }
 
     // ------------------------------------------------------------------ Progreso

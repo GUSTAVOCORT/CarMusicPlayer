@@ -21,6 +21,7 @@ object PlaybackStore {
     private const val K_MEDIA_ID = "media_id"
     private const val K_RESTORE_PENDING = "restore_pending"
     private const val K_VIS_STYLE = "vis_style"
+    private const val K_PALETTE = "palette"
 
     const val SOURCE_ALL = "ALL"
 
@@ -89,6 +90,13 @@ object PlaybackStore {
             .remove(K_PLAYING)
             .putBoolean(K_RESTORE_PENDING, false)
             .commit()
+    }
+
+    /** Paleta de colores de toda la interfaz. */
+    fun palette(c: Context): Int = prefs(c).getInt(K_PALETTE, 0)
+
+    fun setPalette(c: Context, index: Int) {
+        prefs(c).edit().putInt(K_PALETTE, index).apply()
     }
 
     /** Estilo del visualizador: 0 barras, 1 onda, 2 circulo. */

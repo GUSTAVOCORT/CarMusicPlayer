@@ -61,7 +61,7 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/txtSubtitle" />
 
-    <!-- ---- Controles grandes (72dp: por encima del minimo de 64dp) ---- -->
+    <!-- Controles grandes: 72dp, por encima del minimo de 64dp -->
 
     <ImageButton
         android:id="@+id/btnPrev"

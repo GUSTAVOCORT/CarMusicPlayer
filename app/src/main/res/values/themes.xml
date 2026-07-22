@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools">
+
+    <style name="Theme.CarPlayer" parent="Theme.AppCompat.NoActionBar">
+        <item name="android:windowBackground">@color/bg</item>
+        <item name="android:colorAccent" tools:targetApi="21">@color/accent</item>
+        <item name="android:statusBarColor" tools:targetApi="21">@color/bg</item>
+        <item name="android:navigationBarColor" tools:targetApi="21">@color/bg</item>
+    </style>
+
+    <!-- Boton grande: 72dp reales (minimo exigido 64dp) -->
+    <style name="CarButton">
+        <item name="android:layout_width">72dp</item>
+        <item name="android:layout_height">72dp</item>
+        <item name="android:background">@drawable/bg_button</item>
+        <item name="android:scaleType">centerInside</item>
+        <item name="android:padding">16dp</item>
+    </style>
+
+    <style name="CarChip" parent="Widget.AppCompat.Button.Borderless">
+        <item name="android:layout_height">64dp</item>
+        <item name="android:background">@drawable/bg_button</item>
+        <item name="android:textColor">@color/text_primary</item>
+        <item name="android:textSize">15sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:drawablePadding">8dp</item>
+        <item name="android:paddingHorizontal">10dp</item>
+    </style>
+</resources>

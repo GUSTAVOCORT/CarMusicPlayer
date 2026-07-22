@@ -1,0 +1,200 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Diseñado para 1024x600 landscape. Jerarquia plana: 1 solo ConstraintLayout raiz. -->
+<androidx.constraintlayout.widget.ConstraintLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/bg"
+    android:padding="12dp">
+
+    <androidx.constraintlayout.widget.Guideline
+        android:id="@+id/gl_split"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        app:layout_constraintGuide_percent="0.56" />
+
+    <!-- ==================== PANEL IZQUIERDO: reproduccion ==================== -->
+
+    <TextView
+        android:id="@+id/txtTitle"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:maxLines="1"
+        android:ellipsize="marquee"
+        android:marqueeRepeatLimit="marquee_forever"
+        android:singleLine="true"
+        android:focusable="true"
+        android:focusableInTouchMode="true"
+        android:textColor="@color/text_primary"
+        android:textSize="26sp"
+        android:textStyle="bold"
+        tools:text="Nombre de la cancion"
+        app:layout_constraintEnd_toStartOf="@id/gl_split"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <TextView
+        android:id="@+id/txtSubtitle"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:maxLines="1"
+        android:ellipsize="end"
+        android:textColor="@color/accent"
+        android:textSize="16sp"
+        tools:text="Carpeta / Artista"
+        app:layout_constraintEnd_toStartOf="@id/gl_split"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/txtTitle" />
+
+    <com.carplayer.music.view.AudioVisualizerView
+        android:id="@+id/visualizer"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:layout_marginTop="14dp"
+        android:layout_marginBottom="14dp"
+        app:layout_constraintBottom_toTopOf="@id/btnPlay"
+        app:layout_constraintEnd_toStartOf="@id/gl_split"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/txtSubtitle" />
+
+    <!-- ---- Controles grandes (72dp: por encima del minimo de 64dp) ---- -->
+
+    <ImageButton
+        android:id="@+id/btnPrev"
+        style="@style/CarButton"
+        android:contentDescription="@string/prev"
+        android:src="@drawable/ic_prev"
+        app:layout_constraintBottom_toBottomOf="@id/btnPlay"
+        app:layout_constraintEnd_toStartOf="@id/btnPlay"
+        app:layout_constraintHorizontal_chainStyle="packed"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="@id/btnPlay" />
+
+    <ImageButton
+        android:id="@+id/btnPlay"
+        android:layout_width="88dp"
+        android:layout_height="88dp"
+        android:layout_marginBottom="10dp"
+        android:background="@drawable/bg_button_primary"
+        android:contentDescription="@string/play"
+        android:scaleType="centerInside"
+        android:src="@drawable/ic_play"
+        app:layout_constraintBottom_toTopOf="@id/btnShuffleAll"
+        app:layout_constraintEnd_toStartOf="@id/btnNext"
+        app:layout_constraintStart_toEndOf="@id/btnPrev" />
+
+    <ImageButton
+        android:id="@+id/btnNext"
+        style="@style/CarButton"
+        android:contentDescription="@string/next"
+        android:src="@drawable/ic_next"
+        app:layout_constraintBottom_toBottomOf="@id/btnPlay"
+        app:layout_constraintEnd_toStartOf="@id/gl_split"
+        app:layout_constraintStart_toEndOf="@id/btnPlay"
+        app:layout_constraintTop_toTopOf="@id/btnPlay" />
+
+    <Button
+        android:id="@+id/btnShuffleAll"
+        style="@style/CarChip"
+        android:layout_width="0dp"
+        android:drawableStart="@drawable/ic_shuffle"
+        android:text="@string/shuffle_all"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toStartOf="@id/btnShuffleFolder"
+        app:layout_constraintStart_toStartOf="parent" />
+
+    <Button
+        android:id="@+id/btnShuffleFolder"
+        style="@style/CarChip"
+        android:layout_width="0dp"
+        android:layout_marginStart="10dp"
+        android:drawableStart="@drawable/ic_shuffle"
+        android:text="@string/shuffle_folder"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toStartOf="@id/gl_split"
+        app:layout_constraintStart_toEndOf="@id/btnShuffleAll" />
+
+    <!-- ==================== PANEL DERECHO: explorador ==================== -->
+
+    <ImageButton
+        android:id="@+id/btnBrowse"
+        style="@style/CarButton"
+        android:layout_width="64dp"
+        android:layout_height="64dp"
+        android:layout_marginStart="14dp"
+        android:contentDescription="@string/folders"
+        android:src="@drawable/ic_folder"
+        app:layout_constraintStart_toStartOf="@id/gl_split"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <ImageButton
+        android:id="@+id/btnRescan"
+        style="@style/CarButton"
+        android:layout_width="64dp"
+        android:layout_height="64dp"
+        android:contentDescription="@string/rescan"
+        android:src="@drawable/ic_refresh"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <TextView
+        android:id="@+id/txtFolder"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginHorizontal="10dp"
+        android:ellipsize="middle"
+        android:singleLine="true"
+        android:textColor="@color/text_primary"
+        android:textSize="20sp"
+        android:textStyle="bold"
+        tools:text="/USB/Rock"
+        app:layout_constraintBottom_toBottomOf="@id/btnBrowse"
+        app:layout_constraintEnd_toStartOf="@id/btnRescan"
+        app:layout_constraintStart_toEndOf="@id/btnBrowse"
+        app:layout_constraintTop_toTopOf="@id/btnBrowse" />
+
+    <TextView
+        android:id="@+id/txtStatus"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="14dp"
+        android:layout_marginTop="4dp"
+        android:textColor="@color/text_secondary"
+        android:textSize="13sp"
+        tools:text="1.248 pistas en 37 carpetas"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="@id/gl_split"
+        app:layout_constraintTop_toBottomOf="@id/btnBrowse" />
+
+    <ProgressBar
+        android:id="@+id/progress"
+        android:layout_width="28dp"
+        android:layout_height="28dp"
+        android:indeterminateTint="@color/accent"
+        android:visibility="gone"
+        app:layout_constraintBottom_toBottomOf="@id/txtStatus"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toTopOf="@id/txtStatus"
+        tools:visibility="visible" />
+
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/recycler"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:layout_marginStart="14dp"
+        android:layout_marginTop="8dp"
+        android:background="@drawable/bg_panel"
+        android:clipToPadding="false"
+        android:paddingVertical="6dp"
+        android:scrollbars="vertical"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="@id/gl_split"
+        app:layout_constraintTop_toBottomOf="@id/txtStatus"
+        tools:listitem="@layout/item_row" />
+
+</androidx.constraintlayout.widget.ConstraintLayout>

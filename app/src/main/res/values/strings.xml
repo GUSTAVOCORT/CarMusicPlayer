@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Car Music</string>
+    <string name="play">Reproducir</string>
+    <string name="next">Siguiente</string>
+    <string name="prev">Anterior</string>
+    <string name="shuffle_all">MEZCLAR TODO</string>
+    <string name="shuffle_folder">MEZCLAR CARPETA</string>
+    <string name="folders">Carpetas</string>
+    <string name="rescan">Reescanear</string>
+    <string name="up_dir">.. Volver a carpetas</string>
+    <string name="all_folders">Carpetas del pendrive</string>
+    <string name="nothing_playing">Sin reproduccion</string>
+    <string name="scanning">Escaneando USB...</string>
+    <string name="no_permission">Sin permiso de almacenamiento</string>
+    <string name="found_tracks">%1$d pistas en %2$d carpetas</string>
+    <string name="tracks_count">%d pistas</string>
+</resources>

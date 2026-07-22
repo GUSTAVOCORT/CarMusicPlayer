@@ -92,7 +92,7 @@ class MusicService : MediaSessionService() {
 
         player.addListener(object : Player.Listener {
             override fun onIsPlayingChanged(isPlaying: Boolean) {
-                saveState()
+                saveState(immediate = !isPlaying)   // al pausar, al disco ya mismo
                 if (isPlaying) {
                     handler.removeCallbacks(saveTicker)
                     handler.postDelayed(saveTicker, 5_000)
@@ -130,20 +130,21 @@ class MusicService : MediaSessionService() {
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? =
         mediaSession
 
-    private fun saveState() {
+    private fun saveState(immediate: Boolean = false) {
         val p = mediaSession?.player ?: return
         if (p.mediaItemCount == 0) return
         PlaybackStore.savePosition(
             this,
             p.currentMediaItemIndex,
             p.currentPosition.coerceAtLeast(0L),
-            p.isPlaying
+            p.isPlaying,
+            immediate
         )
     }
 
     /** Si el usuario cierra la app desde recientes, seguimos sonando salvo que este en pausa. */
     override fun onTaskRemoved(rootIntent: Intent?) {
-        saveState()
+        saveState(immediate = true)
         val player = mediaSession?.player ?: return stopSelf()
         if (!player.playWhenReady || player.mediaItemCount == 0) {
             stopSelf()
@@ -151,7 +152,7 @@ class MusicService : MediaSessionService() {
     }
 
     override fun onDestroy() {
-        saveState()
+        saveState(immediate = true)
         handler.removeCallbacks(saveTicker)
         AudioFx.release()
         mediaSession?.run {

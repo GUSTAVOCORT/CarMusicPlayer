@@ -31,13 +31,25 @@ object PlaybackStore {
             .apply()
     }
 
-    /** El Service guarda el avance cada pocos segundos. */
-    fun savePosition(c: Context, index: Int, positionMs: Long, playing: Boolean) {
-        prefs(c).edit()
+    /**
+     * El Service guarda el avance cada pocos segundos.
+     *
+     * [immediate] usa commit() en vez de apply(): escribe al disco antes de devolver.
+     * Se usa al pausar o al morir el proceso, porque en un auto la corriente se corta
+     * de golpe y un apply() pendiente se pierde.
+     */
+    fun savePosition(
+        c: Context,
+        index: Int,
+        positionMs: Long,
+        playing: Boolean,
+        immediate: Boolean = false
+    ) {
+        val e = prefs(c).edit()
             .putInt(K_INDEX, index)
             .putLong(K_POSITION, positionMs)
             .putBoolean(K_PLAYING, playing)
-            .apply()
+        if (immediate) e.commit() else e.apply()
     }
 
     fun source(c: Context): String? = prefs(c).getString(K_SOURCE, null)

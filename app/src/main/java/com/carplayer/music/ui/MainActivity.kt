@@ -46,6 +46,10 @@ import java.util.Locale
 @UnstableApi
 class MainActivity : AppCompatActivity() {
 
+    private companion object {
+        const val APP_VERSION = "v3.1"
+    }
+
     private lateinit var b: ActivityMainBinding
     private lateinit var adapter: BrowserAdapter
 
@@ -75,6 +79,9 @@ class MainActivity : AppCompatActivity() {
     private val progressTicker = object : Runnable {
         override fun run() {
             updateProgress()
+            // El controlador y el escaneo terminan en momentos impredecibles;
+            // en vez de depender de quien llegue ultimo, se reintenta hasta lograrlo.
+            if (!restored) maybeRestore()
             ui.postDelayed(this, 500)
         }
     }
@@ -207,6 +214,18 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onStop() {
+        // Respaldo por si el Service ya fue liquidado por el sistema
+        controller?.let { c ->
+            if (c.mediaItemCount > 0) {
+                PlaybackStore.savePosition(
+                    this,
+                    c.currentMediaItemIndex,
+                    c.currentPosition.coerceAtLeast(0L),
+                    c.isPlaying,
+                    immediate = true
+                )
+            }
+        }
         ui.removeCallbacks(progressTicker)
         controller?.removeListener(playerListener)
         controllerFuture?.let { MediaController.releaseFuture(it) }
@@ -257,9 +276,7 @@ class MainActivity : AppCompatActivity() {
             if (cached != null) {
                 MusicIndex.publish(cached)
                 showRoot()
-                b.txtStatus.text = getString(
-                    R.string.found_tracks, cached.size, MusicIndex.byFolder.size
-                )
+                b.txtStatus.text = status(cached.size, R.string.from_cache)
                 maybeRestore()
             } else {
                 b.txtStatus.text = getString(R.string.scanning)
@@ -273,9 +290,7 @@ class MainActivity : AppCompatActivity() {
                 MusicIndex.publish(fresh)
                 IndexCache.save(applicationContext, fresh)
                 if (currentFolder == null) showRoot() else showFolder(currentFolder!!)
-                b.txtStatus.text = getString(
-                    R.string.found_tracks, fresh.size, MusicIndex.byFolder.size
-                )
+                b.txtStatus.text = status(fresh.size, R.string.from_scan)
                 maybeRestore()
             }
         }
@@ -304,6 +319,11 @@ class MainActivity : AppCompatActivity() {
         restored = true
         val index = PlaybackStore.index(this).coerceIn(0, songs.size - 1)
         val pos = PlaybackStore.position(this)
+        Toast.makeText(
+            this,
+            getString(R.string.resuming, songs[index].title),
+            Toast.LENGTH_SHORT
+        ).show()
 
         loadQueue(
             songs = songs,
@@ -441,9 +461,7 @@ class MainActivity : AppCompatActivity() {
                 IndexCache.save(applicationContext, fresh)
                 b.progress.visibility = View.GONE
                 showRoot()
-                b.txtStatus.text = getString(
-                    R.string.found_tracks, fresh.size, MusicIndex.byFolder.size
-                )
+                b.txtStatus.text = status(fresh.size, R.string.from_scan)
             }
         }
 
@@ -503,6 +521,15 @@ class MainActivity : AppCompatActivity() {
         }
         b.txtDuration.text = formatTime(dur)
     }
+
+    /** Linea de estado con la version: sirve para saber que APK quedo instalado. */
+    private fun status(tracks: Int, originRes: Int): String = getString(
+        R.string.status_line,
+        APP_VERSION,
+        tracks,
+        MusicIndex.byFolder.size,
+        getString(originRes)
+    )
 
     private fun formatTime(ms: Long): String {
         val total = ms / 1000

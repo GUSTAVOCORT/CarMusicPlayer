@@ -23,4 +23,8 @@
     <string name="mode_normal">Vista normal</string>
     <string name="mode_wide">Sin lista</string>
     <string name="mode_full">Pantalla completa</string>
+    <string name="status_line">%1$s  ·  %2$d pistas en %3$d carpetas  ·  %4$s</string>
+    <string name="from_cache">memoria</string>
+    <string name="from_scan">USB</string>
+    <string name="resuming">Retomando: %s</string>
 </resources>

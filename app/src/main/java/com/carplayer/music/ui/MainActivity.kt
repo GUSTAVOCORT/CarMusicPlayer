@@ -36,7 +36,9 @@ import com.carplayer.music.player.AudioFx
 import com.carplayer.music.player.MusicService
 import com.carplayer.music.player.PlaybackStore
 import com.carplayer.music.player.PlayerBus
+import android.graphics.Bitmap
 import com.carplayer.music.scanner.BrowserItem
+import com.carplayer.music.scanner.CoverArt
 import com.carplayer.music.scanner.IndexCache
 import com.carplayer.music.scanner.MusicIndex
 import com.carplayer.music.scanner.Song
@@ -52,7 +54,7 @@ import java.util.Locale
 class MainActivity : AppCompatActivity() {
 
     private companion object {
-        const val APP_VERSION = "v4.2"
+        const val APP_VERSION = "v4.3"
         // El canal Binder entre pantalla y servicio revienta pasado ~1 MB por
         // transaccion. 400 pistas entran holgadas: son casi 24 horas de musica.
         const val MAX_QUEUE = 400
@@ -85,6 +87,9 @@ class MainActivity : AppCompatActivity() {
 
     /** Estamos mostrando resultados de busqueda en vez del explorador. */
     private var searching = false
+
+    /** Contador para ignorar caratulas que llegan tarde tras cambiar de cancion. */
+    private var coverToken = 0
 
     /** Refresco de la barra de progreso: 2 veces por segundo alcanza y sobra. */
     private val progressTicker = object : Runnable {
@@ -171,7 +176,7 @@ class MainActivity : AppCompatActivity() {
         setFull.clone(setWide)
         intArrayOf(
             R.id.txtTitle, R.id.txtSubtitle, R.id.seekBar,
-            R.id.txtPosition, R.id.txtDuration,
+            R.id.txtPosition, R.id.txtDuration, R.id.coverArt,
             R.id.btnPlay, R.id.btnPrev, R.id.btnNext,
             R.id.btnShuffleAll, R.id.btnShuffleFolder
         ).forEach { setFull.setVisibility(it, ConstraintSet.GONE) }
@@ -198,6 +203,8 @@ class MainActivity : AppCompatActivity() {
             else -> setNormal.applyTo(b.root)
         }
         PlaybackStore.setScreenMode(this, mode)
+        b.coverBackground.visibility =
+            if (mode == 2 && b.coverBackground.drawable != null) View.VISIBLE else View.GONE
         if (announce) {
             val name = when (mode) {
                 1 -> R.string.mode_wide
@@ -737,10 +744,42 @@ class MainActivity : AppCompatActivity() {
             b.txtTitle.text = getString(R.string.nothing_playing)
             b.txtSubtitle.text = ""
             adapter.playingPath = null
+            setCover(null)
             return
         }
         b.txtTitle.text = item.mediaMetadata.title ?: item.mediaId
         b.txtSubtitle.text = item.mediaMetadata.albumTitle ?: ""
         adapter.playingPath = item.mediaId
+        loadCoverFor(item.mediaId)
+    }
+
+    /**
+     * Lee la caratula de la cancion actual bajo demanda y con cache.
+     * El token evita que una imagen que tardo en cargar pise a la de la
+     * cancion siguiente si el usuario paso rapido de tema.
+     */
+    private fun loadCoverFor(path: String?) {
+        val token = ++coverToken
+        if (path.isNullOrEmpty()) {
+            setCover(null)
+            return
+        }
+        lifecycleScope.launch {
+            val bmp = CoverArt.load(applicationContext, path)
+            if (token == coverToken) setCover(bmp)
+        }
+    }
+
+    private fun setCover(bmp: Bitmap?) {
+        if (bmp != null) {
+            b.coverArt.setImageBitmap(bmp)
+            b.coverBackground.setImageBitmap(bmp)
+        } else {
+            b.coverArt.setImageResource(R.drawable.ic_album_placeholder)
+            b.coverBackground.setImageDrawable(null)
+        }
+        // El fondo solo se ve en pantalla completa y si hay imagen real
+        b.coverBackground.visibility =
+            if (bmp != null && screenMode == 2) View.VISIBLE else View.GONE
     }
 }

@@ -1,0 +1,16 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <!-- Circulo exterior tenue -->
+    <path android:strokeColor="#22D3EE" android:strokeWidth="2.5"
+        android:fillColor="#00000000"
+        android:pathData="M54,30 a24,24 0 1,0 0.01,0" android:strokeAlpha="0.35" />
+    <!-- Barras espectrales centradas, de bajo a alto y de vuelta -->
+    <group android:name="bars">
+        <path android:fillColor="#0E7490" android:pathData="M38,60 h5 v10 h-5 z" />
+        <path android:fillColor="#22D3EE" android:pathData="M45.5,50 h5 v20 h-5 z" />
+        <path android:fillColor="#67E8F9" android:pathData="M53,40 h5 v30 h-5 z" />
+        <path android:fillColor="#22D3EE" android:pathData="M60.5,48 h5 v22 h-5 z" />
+        <path android:fillColor="#0E7490" android:pathData="M68,58 h5 v12 h-5 z" />
+    </group>
+</vector>

@@ -9,6 +9,21 @@
     android:background="@color/bg"
     android:padding="12dp">
 
+    <!-- Caratula de fondo (solo visible en pantalla completa). Detras de todo. -->
+    <ImageView
+        android:id="@+id/coverBackground"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:layout_margin="-12dp"
+        android:alpha="0.28"
+        android:contentDescription="@null"
+        android:scaleType="centerCrop"
+        android:visibility="gone"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
     <androidx.constraintlayout.widget.Guideline
         android:id="@+id/gl_split"
         android:layout_width="wrap_content"
@@ -18,10 +33,21 @@
 
     <!-- ==================== PANEL IZQUIERDO: reproduccion ==================== -->
 
+    <ImageView
+        android:id="@+id/coverArt"
+        android:layout_width="72dp"
+        android:layout_height="72dp"
+        android:contentDescription="@string/cover_desc"
+        android:scaleType="centerCrop"
+        android:src="@drawable/ic_album_placeholder"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
     <TextView
         android:id="@+id/txtTitle"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
+        android:layout_marginStart="12dp"
         android:ellipsize="marquee"
         android:focusable="true"
         android:focusableInTouchMode="true"
@@ -30,22 +56,26 @@
         android:textColor="@color/text_primary"
         android:textSize="26sp"
         android:textStyle="bold"
+        app:layout_constraintBottom_toTopOf="@id/txtSubtitle"
         app:layout_constraintEnd_toStartOf="@id/gl_split"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintStart_toEndOf="@id/coverArt"
+        app:layout_constraintTop_toTopOf="@id/coverArt"
+        app:layout_constraintVertical_chainStyle="packed"
         tools:text="Nombre de la cancion" />
 
     <TextView
         android:id="@+id/txtSubtitle"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
+        android:layout_marginStart="12dp"
         android:layout_marginTop="2dp"
         android:ellipsize="end"
         android:maxLines="1"
         android:textColor="@color/accent"
         android:textSize="16sp"
+        app:layout_constraintBottom_toBottomOf="@id/coverArt"
         app:layout_constraintEnd_toStartOf="@id/gl_split"
-        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintStart_toEndOf="@id/coverArt"
         app:layout_constraintTop_toBottomOf="@id/txtTitle"
         tools:text="Carpeta / Artista" />
 
@@ -62,7 +92,7 @@
         android:thumbTint="@color/accent"
         app:layout_constraintEnd_toStartOf="@id/gl_split"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/txtSubtitle" />
+        app:layout_constraintTop_toBottomOf="@id/coverArt" />
 
     <TextView
         android:id="@+id/txtPosition"

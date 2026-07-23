@@ -37,4 +37,5 @@
     <string name="style_wave">Estilo: Onda</string>
     <string name="style_circle">Estilo: Circulo</string>
     <string name="palette_title">Colores de la pantalla</string>
+    <string name="cover_desc">Caratula del album</string>
 </resources>

@@ -56,7 +56,7 @@ import java.util.Locale
 class MainActivity : AppCompatActivity() {
 
     private companion object {
-        const val APP_VERSION = "v4.5"
+        const val APP_VERSION = "v4.7"
         // El canal Binder entre pantalla y servicio revienta pasado ~1 MB por
         // transaccion. 400 pistas entran holgadas: son casi 24 horas de musica.
         const val MAX_QUEUE = 400
@@ -222,11 +222,13 @@ class MainActivity : AppCompatActivity() {
         // asi las barras se siguen viendo grandes debajo del reloj.
         setFull.setVisibility(R.id.clock, ConstraintSet.VISIBLE)
         setFull.clear(R.id.clock, ConstraintSet.BOTTOM)
-        setFull.connect(R.id.clock, ConstraintSet.TOP, ConstraintSet.PARENT_ID, ConstraintSet.TOP, 24)
+        setFull.clear(R.id.clock, ConstraintSet.START)
+        setFull.clear(R.id.clock, ConstraintSet.END)
+        setFull.connect(R.id.clock, ConstraintSet.TOP, ConstraintSet.PARENT_ID, ConstraintSet.TOP, 12)
         setFull.connect(R.id.clock, ConstraintSet.START, ConstraintSet.PARENT_ID, ConstraintSet.START, 0)
         setFull.connect(R.id.clock, ConstraintSet.END, ConstraintSet.PARENT_ID, ConstraintSet.END, 0)
 
-        setFull.connect(R.id.visualizer, ConstraintSet.TOP, R.id.clock, ConstraintSet.BOTTOM, 8)
+        setFull.connect(R.id.visualizer, ConstraintSet.TOP, R.id.clock, ConstraintSet.BOTTOM, 12)
         setFull.connect(R.id.visualizer, ConstraintSet.BOTTOM, ConstraintSet.PARENT_ID, ConstraintSet.BOTTOM, 0)
         setFull.connect(R.id.visualizer, ConstraintSet.START, ConstraintSet.PARENT_ID, ConstraintSet.START, 0)
         setFull.connect(R.id.visualizer, ConstraintSet.END, ConstraintSet.PARENT_ID, ConstraintSet.END, 0)
@@ -818,8 +820,8 @@ class MainActivity : AppCompatActivity() {
         // En pantalla completa el reloj se fuerza visible salvo que el usuario lo oculto
         b.clock.visibility = if (pos == 0) View.GONE else View.VISIBLE
         // pos 2 = grande: se agranda cuando entra a pantalla completa (ver applyScreenMode)
-        val big = screenMode == 2      // en pantalla completa siempre grande
-        val h = (if (big) 110 else 46) * resources.displayMetrics.density
+        val big = screenMode == 2      // en pantalla completa, grande de verdad
+        val h = (if (big) 130 else 54) * resources.displayMetrics.density
         b.clock.layoutParams = b.clock.layoutParams.apply { height = h.toInt() }
         b.clock.requestLayout()
     }
@@ -832,14 +834,21 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun applyNeon(on: Boolean) {
+        val accent = Palettes.get(PlaybackStore.palette(this)).accent
+        b.visualizer.setNeonColor(accent)
         b.visualizer.setNeon(on)
         b.visualizer.setFrame(on)      // el marco acompaña al neon
         b.clock.neon = on
-        // Glow en el titulo y subtitulo de la izquierda
-        val glow = if (on) 18f else 0f
-        val accent = Palettes.get(PlaybackStore.palette(this)).accent
-        b.txtTitle.setShadowLayer(glow, 0f, 0f, 0xFFFFFFFF.toInt())
-        b.txtSubtitle.setShadowLayer(glow, 0f, 0f, accent)
+        if (on) {
+            // Letras en el color del neon, con glow del mismo tono
+            b.txtTitle.setTextColor(accent)
+            b.txtTitle.setShadowLayer(20f, 0f, 0f, accent)
+            b.txtSubtitle.setShadowLayer(16f, 0f, 0f, accent)
+        } else {
+            b.txtTitle.setTextColor(0xFFF2F5F7.toInt())
+            b.txtTitle.setShadowLayer(0f, 0f, 0f, 0)
+            b.txtSubtitle.setShadowLayer(0f, 0f, 0f, 0)
+        }
     }
 
     // ------------------------------------------------------------------ Colores
@@ -894,6 +903,11 @@ class MainActivity : AppCompatActivity() {
         b.progress.indeterminateTintList = tint
 
         b.visualizer.setPalette(p.bars, p.reactive)
+        // Si el neon esta encendido, adopta el color de la nueva paleta
+        if (PlaybackStore.neon(this)) {
+            b.visualizer.setNeonColor(accent)
+            applyNeon(true)
+        }
     }
 
     // ------------------------------------------------------------------ Progreso

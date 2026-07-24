@@ -50,6 +50,13 @@ class NixieClockView @JvmOverloads constructor(
             invalidate()
         }
 
+    /** Color del glow. Por defecto el naranja de tubo; se puede teñir con la paleta. */
+    var glowColor: Int = GLOW
+        set(value) {
+            field = value
+            invalidate()
+        }
+
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         strokeCap = Paint.Cap.ROUND
     }
@@ -82,7 +89,10 @@ class NixieClockView @JvmOverloads constructor(
 
         val digits = intArrayOf(hh / 10, hh % 10, -1, mm / 10, mm % 10)  // -1 = dos puntos
 
-        val h = height.toFloat()
+        // Margen interno para que los digitos no queden pegados a los bordes
+        val padV = height * 0.14f
+        val h = height.toFloat() - padV * 2f
+        val topOffset = padV
         val digitW = h * 0.5f
         val gap = digitW * 0.25f
         val colonW = digitW * 0.4f
@@ -93,10 +103,10 @@ class NixieClockView @JvmOverloads constructor(
 
         for (d in digits) {
             if (d == -1) {
-                drawColon(canvas, x + colonW / 2f, h, thick)
+                drawColon(canvas, x + colonW / 2f, topOffset, h, thick)
                 x += colonW + gap
             } else {
-                drawDigit(canvas, d, x, h * 0.2f, digitW, h * 0.6f, thick)
+                drawDigit(canvas, d, x, topOffset + h * 0.1f, digitW, h * 0.8f, thick)
                 x += digitW + gap
             }
         }
@@ -121,7 +131,7 @@ class NixieClockView @JvmOverloads constructor(
     private fun stylePaint(on: Boolean) {
         if (on) {
             paint.color = LIT
-            if (neon) paint.setShadowLayer(paint.strokeWidth * 1.4f, 0f, 0f, GLOW)
+            if (neon) paint.setShadowLayer(paint.strokeWidth * 1.4f, 0f, 0f, glowColor)
             else paint.clearShadowLayer()
         } else {
             paint.color = DIM
@@ -139,10 +149,10 @@ class NixieClockView @JvmOverloads constructor(
         canvas.drawLine(x, y1 + t, x, y2 - t, paint)
     }
 
-    private fun drawColon(canvas: Canvas, cx: Float, h: Float, t: Float) {
+    private fun drawColon(canvas: Canvas, cx: Float, top: Float, h: Float, t: Float) {
         stylePaint(true)
-        canvas.drawCircle(cx, h * 0.38f, t * 0.6f, paint)
-        canvas.drawCircle(cx, h * 0.62f, t * 0.6f, paint)
+        canvas.drawCircle(cx, top + h * 0.38f, t * 0.6f, paint)
+        canvas.drawCircle(cx, top + h * 0.62f, t * 0.6f, paint)
         paint.clearShadowLayer()
     }
 }

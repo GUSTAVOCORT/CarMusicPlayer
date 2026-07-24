@@ -77,10 +77,10 @@ class AudioVisualizerView @JvmOverloads constructor(
     private var palette = PALETTE
     private var reactive = 0
     private var neon = false
+    private var neonColor = 0xFF22D3EE.toInt()
     private var frame = false
     private val framePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
-        color = 0xFF22D3EE.toInt()
     }
     private val frameRect = RectF()
     private val reactiveColors = IntArray(BARS)   // color por barra, recalculado por cuadro
@@ -208,11 +208,19 @@ class AudioVisualizerView @JvmOverloads constructor(
         neon = on
         if (on) {
             setLayerType(LAYER_TYPE_SOFTWARE, null)
-            barPaint.setShadowLayer(barWidth.coerceAtLeast(6f) * 0.9f, 0f, 0f, 0xFF22D3EE.toInt())
+            barPaint.setShadowLayer(barWidth.coerceAtLeast(6f) * 0.9f, 0f, 0f, neonColor)
         } else {
             barPaint.clearShadowLayer()
             setLayerType(LAYER_TYPE_HARDWARE, null)
         }
+        invalidate()
+    }
+
+    /** Color del glow del neon y del marco. Se suele pasar el acento de la paleta. */
+    fun setNeonColor(color: Int) {
+        neonColor = color
+        framePaint.color = color
+        if (neon) barPaint.setShadowLayer(barWidth.coerceAtLeast(6f) * 0.9f, 0f, 0f, neonColor)
         invalidate()
     }
 
@@ -432,7 +440,7 @@ class AudioVisualizerView @JvmOverloads constructor(
         val inset = framePaint.strokeWidth
         frameRect.set(inset, inset, width - inset, height - inset)
         val r = height * 0.06f
-        if (neon) framePaint.setShadowLayer(framePaint.strokeWidth * 2.2f, 0f, 0f, 0xFF22D3EE.toInt())
+        if (neon) framePaint.setShadowLayer(framePaint.strokeWidth * 2.2f, 0f, 0f, neonColor)
         else framePaint.clearShadowLayer()
         canvas.drawRoundRect(frameRect, r, r, framePaint)
     }

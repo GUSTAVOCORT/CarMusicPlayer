@@ -62,12 +62,15 @@
 
     <com.carplayer.music.view.NixieClockView
         android:id="@+id/clock"
-        android:layout_width="180dp"
-        android:layout_height="46dp"
+        android:layout_width="0dp"
+        android:layout_height="54dp"
+        android:layout_marginStart="14dp"
+        android:layout_marginTop="6dp"
+        android:paddingVertical="4dp"
         android:visibility="gone"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintStart_toStartOf="@id/gl_split"
+        app:layout_constraintTop_toBottomOf="@id/txtStatus"
         tools:visibility="visible" />
 
     <ImageView
@@ -321,7 +324,14 @@
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="@id/gl_split"
-        app:layout_constraintTop_toBottomOf="@id/txtStatus"
+        app:layout_constraintTop_toBottomOf="@id/clockBarrier"
         tools:listitem="@layout/item_row" />
+
+    <androidx.constraintlayout.widget.Barrier
+        android:id="@+id/clockBarrier"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        app:barrierDirection="bottom"
+        app:constraint_referenced_ids="txtStatus,clock" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

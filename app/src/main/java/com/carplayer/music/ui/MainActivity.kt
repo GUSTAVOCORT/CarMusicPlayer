@@ -56,7 +56,7 @@ import java.util.Locale
 class MainActivity : AppCompatActivity() {
 
     private companion object {
-        const val APP_VERSION = "v4.8"
+        const val APP_VERSION = "v4.9"
         // El canal Binder entre pantalla y servicio revienta pasado ~1 MB por
         // transaccion. 400 pistas entran holgadas: son casi 24 horas de musica.
         const val MAX_QUEUE = 400
@@ -160,10 +160,13 @@ class MainActivity : AppCompatActivity() {
         b.recycler.setItemViewCacheSize(12)
         b.recycler.itemAnimator = null
 
-        // Un toque sobre el visualizador cambia de modo de pantalla.
-        // Doble toque cambia la paleta de colores.
+        // Gestos sobre el visualizador (simples y sin conflictos):
+        //   toque simple -> cambia el modo de pantalla (normal / sin lista / completa)
+        //   toque largo  -> cambia el estilo (barras, onda, circulo, ...)
+        //   doble toque  -> cambia la paleta de colores
         val gestures = android.view.GestureDetector(this,
             object : android.view.GestureDetector.SimpleOnGestureListener() {
+                override fun onDown(e: android.view.MotionEvent): Boolean = true
                 override fun onSingleTapConfirmed(e: android.view.MotionEvent): Boolean {
                     cycleScreenMode()
                     return true
@@ -708,10 +711,14 @@ class MainActivity : AppCompatActivity() {
     // ------------------------------------------------------------------ Ajustes de pantalla
 
     private fun showSettingsDialog() {
+        val autoOn = PlaybackStore.autoColor(this)
+        val autoLabel = getString(R.string.set_autocolor) +
+            "  [" + getString(if (autoOn) R.string.on else R.string.off) + "]"
         val options = arrayOf(
             getString(R.string.set_background),
             getString(R.string.set_clock),
-            getString(R.string.set_neon)
+            getString(R.string.set_neon),
+            autoLabel
         )
         AlertDialog.Builder(this)
             .setTitle(R.string.settings_title)
@@ -720,6 +727,7 @@ class MainActivity : AppCompatActivity() {
                     0 -> showBackgroundDialog()
                     1 -> showClockDialog()
                     2 -> toggleNeon()
+                    3 -> toggleAutoColor()
                 }
             }
             .show()
@@ -848,6 +856,17 @@ class MainActivity : AppCompatActivity() {
         val h = (if (big) 130 else 54) * resources.displayMetrics.density
         b.clock.layoutParams = b.clock.layoutParams.apply { height = h.toInt() }
         b.clock.requestLayout()
+    }
+
+    private fun toggleAutoColor() {
+        val on = !PlaybackStore.autoColor(this)
+        PlaybackStore.setAutoColor(this, on)
+        Toast.makeText(
+            this,
+            getString(R.string.set_autocolor) + ": " +
+                getString(if (on) R.string.on else R.string.off),
+            Toast.LENGTH_SHORT
+        ).show()
     }
 
     private fun toggleNeon() {
@@ -998,6 +1017,12 @@ class MainActivity : AppCompatActivity() {
         override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
             updateNowPlaying(mediaItem)
             updateProgress()
+            // Colores automaticos: cada cancion estrena paleta
+            if (PlaybackStore.autoColor(this@MainActivity) && mediaItem != null) {
+                val next = (PlaybackStore.palette(this@MainActivity) + 1) % Palettes.ALL.size
+                PlaybackStore.setPalette(this@MainActivity, next)
+                applyPalette(next)
+            }
         }
     }
 

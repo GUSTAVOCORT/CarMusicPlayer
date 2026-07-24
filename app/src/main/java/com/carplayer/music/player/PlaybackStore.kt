@@ -25,6 +25,7 @@ object PlaybackStore {
     private const val K_BG_URI = "bg_uri"
     private const val K_CLOCK = "clock_pos"
     private const val K_NEON = "neon"
+    private const val K_AUTO_COLOR = "auto_color"
 
     const val SOURCE_ALL = "ALL"
 
@@ -118,6 +119,12 @@ object PlaybackStore {
     fun neon(c: Context): Boolean = prefs(c).getBoolean(K_NEON, false)
     fun setNeon(c: Context, on: Boolean) {
         prefs(c).edit().putBoolean(K_NEON, on).apply()
+    }
+
+    /** Rotacion automatica de paleta con cada cancion. */
+    fun autoColor(c: Context): Boolean = prefs(c).getBoolean(K_AUTO_COLOR, false)
+    fun setAutoColor(c: Context, on: Boolean) {
+        prefs(c).edit().putBoolean(K_AUTO_COLOR, on).apply()
     }
 
     /** Estilo del visualizador: 0 barras, 1 onda, 2 circulo. */

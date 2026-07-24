@@ -56,7 +56,7 @@ import java.util.Locale
 class MainActivity : AppCompatActivity() {
 
     private companion object {
-        const val APP_VERSION = "v4.7"
+        const val APP_VERSION = "v4.8"
         // El canal Binder entre pantalla y servicio revienta pasado ~1 MB por
         // transaccion. 400 pistas entran holgadas: son casi 24 horas de musica.
         const val MAX_QUEUE = 400
@@ -160,24 +160,26 @@ class MainActivity : AppCompatActivity() {
         b.recycler.setItemViewCacheSize(12)
         b.recycler.itemAnimator = null
 
-        // Un toque sobre el ecualizador cambia de modo de pantalla.
-        b.visualizer.setOnClickListener { cycleScreenMode() }
+        // Un toque sobre el visualizador cambia de modo de pantalla.
+        // Doble toque cambia la paleta de colores.
+        val gestures = android.view.GestureDetector(this,
+            object : android.view.GestureDetector.SimpleOnGestureListener() {
+                override fun onSingleTapConfirmed(e: android.view.MotionEvent): Boolean {
+                    cycleScreenMode()
+                    return true
+                }
+                override fun onDoubleTap(e: android.view.MotionEvent): Boolean {
+                    cyclePalette()
+                    return true
+                }
+                override fun onLongPress(e: android.view.MotionEvent) {
+                    cycleStyle()
+                }
+            })
+        b.visualizer.setOnTouchListener { _, ev -> gestures.onTouchEvent(ev) }
 
         // Diagnostico: mantener presionado el ecualizador muestra si esta usando
         // datos de audio reales o el modo sintetico de respaldo.
-        b.visualizer.setOnLongClickListener {
-            val applied = b.visualizer.setStyle(b.visualizer.currentStyle() + 1)
-            PlaybackStore.setVisualStyle(this, applied)
-            val name = when (applied) {
-                AudioVisualizerView.STYLE_WAVE -> getString(R.string.style_wave)
-                AudioVisualizerView.STYLE_CIRCLE -> getString(R.string.style_circle)
-                AudioVisualizerView.STYLE_DOTS -> getString(R.string.style_dots)
-                AudioVisualizerView.STYLE_MIRROR -> getString(R.string.style_mirror)
-                else -> getString(R.string.style_bars)
-            }
-            Toast.makeText(this, name + "  ·  " + b.visualizer.debugInfo(), Toast.LENGTH_LONG).show()
-            true
-        }
         b.visualizer.setStyle(PlaybackStore.visualStyle(this))
 
         applyPalette(PlaybackStore.palette(this))
@@ -234,6 +236,28 @@ class MainActivity : AppCompatActivity() {
         setFull.connect(R.id.visualizer, ConstraintSet.END, ConstraintSet.PARENT_ID, ConstraintSet.END, 0)
 
         setsReady = true
+    }
+
+    private fun cycleStyle() {
+        val applied = b.visualizer.setStyle(b.visualizer.currentStyle() + 1)
+        PlaybackStore.setVisualStyle(this, applied)
+        val name = when (applied) {
+            AudioVisualizerView.STYLE_WAVE -> getString(R.string.style_wave)
+            AudioVisualizerView.STYLE_CIRCLE -> getString(R.string.style_circle)
+            AudioVisualizerView.STYLE_DOTS -> getString(R.string.style_dots)
+            AudioVisualizerView.STYLE_MIRROR -> getString(R.string.style_mirror)
+            AudioVisualizerView.STYLE_BLOCKS -> getString(R.string.style_blocks)
+            AudioVisualizerView.STYLE_LINE -> getString(R.string.style_line)
+            else -> getString(R.string.style_bars)
+        }
+        Toast.makeText(this, name, Toast.LENGTH_SHORT).show()
+    }
+
+    private fun cyclePalette() {
+        val next = (PlaybackStore.palette(this) + 1) % Palettes.ALL.size
+        PlaybackStore.setPalette(this, next)
+        applyPalette(next)
+        Toast.makeText(this, Palettes.get(next).name, Toast.LENGTH_SHORT).show()
     }
 
     private fun cycleScreenMode() {
@@ -887,11 +911,28 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        // Aro del boton principal, construido a mano para poder recolorear el borde
+        val d = resources.displayMetrics.density
+        // Aro del boton principal
         b.btnPlay.background = GradientDrawable().apply {
             shape = GradientDrawable.OVAL
             setColor(0xFF10151A.toInt())
-            setStroke((3 * resources.displayMetrics.density).toInt(), accent)
+            setStroke((3 * d).toInt(), accent)
+        }
+        // Prev / Next: circulo con borde de acento
+        listOf(b.btnPrev, b.btnNext).forEach { btn ->
+            btn.background = GradientDrawable().apply {
+                shape = GradientDrawable.OVAL
+                setColor(0xFF16232B.toInt())
+                setStroke((2 * d).toInt(), accent)
+            }
+        }
+        // Borde de la lista teñido con un tono del acento (mismo color, mas oscuro)
+        val listBorder = (accent and 0x00FFFFFF) or 0x66000000.toInt()
+        b.recycler.background = GradientDrawable().apply {
+            shape = GradientDrawable.RECTANGLE
+            cornerRadius = 16 * d
+            setColor(0xFF0E1A20.toInt())
+            setStroke((1 * d).toInt(), listBorder)
         }
 
         // Barra de progreso: riel bien visible sobre el fondo negro

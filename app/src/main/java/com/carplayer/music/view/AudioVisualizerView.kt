@@ -47,7 +47,9 @@ class AudioVisualizerView @JvmOverloads constructor(
         const val STYLE_CIRCLE = 2
         const val STYLE_DOTS = 3
         const val STYLE_MIRROR = 4
-        const val STYLE_COUNT = 5
+        const val STYLE_BLOCKS = 5
+        const val STYLE_LINE = 6
+        const val STYLE_COUNT = 7
 
         /** Paleta neon repartida a lo ancho: graves cian -> agudos violeta. */
         private val PALETTE = intArrayOf(
@@ -431,6 +433,8 @@ class AudioVisualizerView @JvmOverloads constructor(
             STYLE_CIRCLE -> drawCircle(canvas)
             STYLE_DOTS -> drawDots(canvas)
             STYLE_MIRROR -> drawMirror(canvas)
+            STYLE_BLOCKS -> drawBlocks(canvas)
+            STYLE_LINE -> drawLine(canvas)
             else -> drawBars(canvas)
         }
         if (frame) drawFrame(canvas)
@@ -529,6 +533,60 @@ class AudioVisualizerView @JvmOverloads constructor(
             wavePath.lineTo(w, mid + dir * current[BARS - 1] * amp)
             canvas.drawPath(wavePath, barPaint)
         }
+    }
+
+    /**
+     * Bloques: cada barra es una pila de segmentos separados, como un ecualizador
+     * de LEDs clasico. El segmento de arriba parpadea segun el pico.
+     */
+    private fun drawBlocks(canvas: Canvas) {
+        val h = height.toFloat()
+        val segs = 12
+        val segH = h / segs
+        val padY = segH * 0.22f
+        var x = 0f
+        for (i in 0 until BARS) {
+            if (reactive != 0) {
+                barPaint.color = reactiveColors[i]
+                if (neon) barPaint.setShadowLayer(barWidth * 0.7f, 0f, 0f, reactiveColors[i])
+            }
+            val lit = (current[i] * segs).toInt().coerceIn(0, segs)
+            for (sIdx in 0 until lit) {
+                val top = h - (sIdx + 1) * segH + padY
+                barRect.set(x, top, x + barWidth, top + segH - padY * 2)
+                canvas.drawRoundRect(barRect, corner * 0.5f, corner * 0.5f, barPaint)
+            }
+            x += barWidth + gap
+        }
+    }
+
+    /**
+     * Linea: una sola linea continua que recorre el ancho siguiendo el espectro,
+     * mas sobria. Reutiliza el Path de la onda.
+     */
+    private fun drawLine(canvas: Canvas) {
+        val h = height.toFloat()
+        val w = width.toFloat()
+        val step = w / (BARS - 1)
+        val old = barPaint.style
+        val oldW = barPaint.strokeWidth
+        barPaint.style = Paint.Style.STROKE
+        barPaint.strokeWidth = h * 0.03f
+        barPaint.strokeJoin = Paint.Join.ROUND
+        if (reactive != 0) barPaint.color = reactiveColors[BARS / 2]
+        wavePath.reset()
+        wavePath.moveTo(0f, h - current[0] * h)
+        for (i in 1 until BARS) {
+            val px = i * step
+            val py = h - current[i] * h
+            val prevX = (i - 1) * step
+            val prevY = h - current[i - 1] * h
+            wavePath.quadTo(prevX, prevY, (prevX + px) / 2f, (prevY + py) / 2f)
+        }
+        wavePath.lineTo(w, h - current[BARS - 1] * h)
+        canvas.drawPath(wavePath, barPaint)
+        barPaint.style = old
+        barPaint.strokeWidth = oldW
     }
 
     /** Iris radial: las barras salen del centro como rayos y laten con la musica. */

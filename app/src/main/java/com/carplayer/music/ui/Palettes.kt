@@ -51,6 +51,41 @@ object Palettes {
             intArrayOf(0xFF3B82F6.toInt(), 0xFFBFDBFE.toInt(), 0xFFFFFFFF.toInt())
         ),
         Palette(
+            "Violeta",
+            0xFFA78BFA.toInt(),
+            intArrayOf(0xFF6D28D9.toInt(), 0xFFA78BFA.toInt(), 0xFFDDD6FE.toInt())
+        ),
+        Palette(
+            "Rosa neon",
+            0xFFF472B6.toInt(),
+            intArrayOf(0xFFBE185D.toInt(), 0xFFF472B6.toInt(), 0xFFFBCFE8.toInt())
+        ),
+        Palette(
+            "Atardecer",
+            0xFFFB923C.toInt(),
+            intArrayOf(0xFF7C3AED.toInt(), 0xFFEC4899.toInt(), 0xFFFB923C.toInt(), 0xFFFDE047.toInt())
+        ),
+        Palette(
+            "Oceano",
+            0xFF2DD4BF.toInt(),
+            intArrayOf(0xFF0F766E.toInt(), 0xFF2DD4BF.toInt(), 0xFF38BDF8.toInt(), 0xFF818CF8.toInt())
+        ),
+        Palette(
+            "Lima",
+            0xFFA3E635.toInt(),
+            intArrayOf(0xFF4D7C0F.toInt(), 0xFFA3E635.toInt(), 0xFFECFCCB.toInt())
+        ),
+        Palette(
+            "Blanco puro",
+            0xFFFFFFFF.toInt(),
+            intArrayOf(0xFF9CA3AF.toInt(), 0xFFF9FAFB.toInt(), 0xFFFFFFFF.toInt())
+        ),
+        Palette(
+            "Fuego",
+            0xFFF87171.toInt(),
+            intArrayOf(0xFF7F1D1D.toInt(), 0xFFEF4444.toInt(), 0xFFF97316.toInt(), 0xFFFACC15.toInt())
+        ),
+        Palette(
             "Reactiva (late con la musica)",
             0xFF22D3EE.toInt(),
             intArrayOf(0xFF22D3EE.toInt(), 0xFFF472B6.toInt()),

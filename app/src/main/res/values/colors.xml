@@ -9,4 +9,6 @@
     <color name="text_secondary">#8A93A0</color>
     <color name="track">#3A404D</color>
     <color name="text_time">#C8CFDA</color>
+    <color name="list_bg">#0E1A20</color>
+    <color name="list_border">#1B3B45</color>
 </resources>

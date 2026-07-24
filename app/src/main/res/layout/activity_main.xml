@@ -173,7 +173,11 @@
 
     <ImageButton
         android:id="@+id/btnPrev"
-        style="@style/CarButton"
+        android:layout_width="80dp"
+        android:layout_height="80dp"
+        android:background="@drawable/bg_transport"
+        android:scaleType="centerInside"
+        android:padding="16dp"
         android:contentDescription="@string/prev"
         android:src="@drawable/ic_prev"
         app:layout_constraintBottom_toBottomOf="@id/btnPlay"
@@ -184,8 +188,8 @@
 
     <ImageButton
         android:id="@+id/btnPlay"
-        android:layout_width="80dp"
-        android:layout_height="80dp"
+        android:layout_width="96dp"
+        android:layout_height="96dp"
         android:layout_marginBottom="10dp"
         android:background="@drawable/bg_button_primary"
         android:contentDescription="@string/play"
@@ -197,7 +201,11 @@
 
     <ImageButton
         android:id="@+id/btnNext"
-        style="@style/CarButton"
+        android:layout_width="80dp"
+        android:layout_height="80dp"
+        android:background="@drawable/bg_transport"
+        android:scaleType="centerInside"
+        android:padding="16dp"
         android:contentDescription="@string/next"
         android:src="@drawable/ic_next"
         app:layout_constraintBottom_toBottomOf="@id/btnPlay"
@@ -317,7 +325,7 @@
         android:layout_height="0dp"
         android:layout_marginStart="14dp"
         android:layout_marginTop="8dp"
-        android:background="@drawable/bg_panel"
+        android:background="@drawable/bg_list"
         android:clipToPadding="false"
         android:paddingVertical="6dp"
         android:scrollbars="vertical"

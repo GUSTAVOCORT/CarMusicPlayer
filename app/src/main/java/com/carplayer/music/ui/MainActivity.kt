@@ -56,7 +56,7 @@ import java.util.Locale
 class MainActivity : AppCompatActivity() {
 
     private companion object {
-        const val APP_VERSION = "v4.4"
+        const val APP_VERSION = "v4.5"
         // El canal Binder entre pantalla y servicio revienta pasado ~1 MB por
         // transaccion. 400 pistas entran holgadas: son casi 24 horas de musica.
         const val MAX_QUEUE = 400
@@ -171,6 +171,8 @@ class MainActivity : AppCompatActivity() {
             val name = when (applied) {
                 AudioVisualizerView.STYLE_WAVE -> getString(R.string.style_wave)
                 AudioVisualizerView.STYLE_CIRCLE -> getString(R.string.style_circle)
+                AudioVisualizerView.STYLE_DOTS -> getString(R.string.style_dots)
+                AudioVisualizerView.STYLE_MIRROR -> getString(R.string.style_mirror)
                 else -> getString(R.string.style_bars)
             }
             Toast.makeText(this, name + "  ·  " + b.visualizer.debugInfo(), Toast.LENGTH_LONG).show()
@@ -181,8 +183,7 @@ class MainActivity : AppCompatActivity() {
         applyPalette(PlaybackStore.palette(this))
         applyBackground()
         applyClock()
-        b.visualizer.setNeon(PlaybackStore.neon(this))
-        b.clock.neon = PlaybackStore.neon(this)
+        applyNeon(PlaybackStore.neon(this))
 
         wireControls()
         requestPermissions()
@@ -217,7 +218,15 @@ class MainActivity : AppCompatActivity() {
             R.id.btnPlay, R.id.btnPrev, R.id.btnNext,
             R.id.btnShuffleAll, R.id.btnShuffleFolder
         ).forEach { setFull.setVisibility(it, ConstraintSet.GONE) }
-        setFull.connect(R.id.visualizer, ConstraintSet.TOP, ConstraintSet.PARENT_ID, ConstraintSet.TOP, 0)
+        // El reloj queda arriba centrado; el visualizador ocupa TODO el resto,
+        // asi las barras se siguen viendo grandes debajo del reloj.
+        setFull.setVisibility(R.id.clock, ConstraintSet.VISIBLE)
+        setFull.clear(R.id.clock, ConstraintSet.BOTTOM)
+        setFull.connect(R.id.clock, ConstraintSet.TOP, ConstraintSet.PARENT_ID, ConstraintSet.TOP, 24)
+        setFull.connect(R.id.clock, ConstraintSet.START, ConstraintSet.PARENT_ID, ConstraintSet.START, 0)
+        setFull.connect(R.id.clock, ConstraintSet.END, ConstraintSet.PARENT_ID, ConstraintSet.END, 0)
+
+        setFull.connect(R.id.visualizer, ConstraintSet.TOP, R.id.clock, ConstraintSet.BOTTOM, 8)
         setFull.connect(R.id.visualizer, ConstraintSet.BOTTOM, ConstraintSet.PARENT_ID, ConstraintSet.BOTTOM, 0)
         setFull.connect(R.id.visualizer, ConstraintSet.START, ConstraintSet.PARENT_ID, ConstraintSet.START, 0)
         setFull.connect(R.id.visualizer, ConstraintSet.END, ConstraintSet.PARENT_ID, ConstraintSet.END, 0)
@@ -806,10 +815,11 @@ class MainActivity : AppCompatActivity() {
 
     private fun applyClock() {
         val pos = PlaybackStore.clockPos(this)
+        // En pantalla completa el reloj se fuerza visible salvo que el usuario lo oculto
         b.clock.visibility = if (pos == 0) View.GONE else View.VISIBLE
         // pos 2 = grande: se agranda cuando entra a pantalla completa (ver applyScreenMode)
-        val big = pos == 2 && screenMode == 2
-        val h = (if (big) 90 else 44) * resources.displayMetrics.density
+        val big = screenMode == 2      // en pantalla completa siempre grande
+        val h = (if (big) 110 else 46) * resources.displayMetrics.density
         b.clock.layoutParams = b.clock.layoutParams.apply { height = h.toInt() }
         b.clock.requestLayout()
     }
@@ -817,9 +827,19 @@ class MainActivity : AppCompatActivity() {
     private fun toggleNeon() {
         val on = !PlaybackStore.neon(this)
         PlaybackStore.setNeon(this, on)
-        b.visualizer.setNeon(on)
-        b.clock.neon = on
+        applyNeon(on)
         if (on) Toast.makeText(this, R.string.neon_warn, Toast.LENGTH_LONG).show()
+    }
+
+    private fun applyNeon(on: Boolean) {
+        b.visualizer.setNeon(on)
+        b.visualizer.setFrame(on)      // el marco acompaña al neon
+        b.clock.neon = on
+        // Glow en el titulo y subtitulo de la izquierda
+        val glow = if (on) 18f else 0f
+        val accent = Palettes.get(PlaybackStore.palette(this)).accent
+        b.txtTitle.setShadowLayer(glow, 0f, 0f, 0xFFFFFFFF.toInt())
+        b.txtSubtitle.setShadowLayer(glow, 0f, 0f, accent)
     }
 
     // ------------------------------------------------------------------ Colores

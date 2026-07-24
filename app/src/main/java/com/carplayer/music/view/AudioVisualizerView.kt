@@ -45,7 +45,9 @@ class AudioVisualizerView @JvmOverloads constructor(
         const val STYLE_BARS = 0
         const val STYLE_WAVE = 1
         const val STYLE_CIRCLE = 2
-        const val STYLE_COUNT = 3
+        const val STYLE_DOTS = 3
+        const val STYLE_MIRROR = 4
+        const val STYLE_COUNT = 5
 
         /** Paleta neon repartida a lo ancho: graves cian -> agudos violeta. */
         private val PALETTE = intArrayOf(
@@ -75,6 +77,12 @@ class AudioVisualizerView @JvmOverloads constructor(
     private var palette = PALETTE
     private var reactive = 0
     private var neon = false
+    private var frame = false
+    private val framePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        color = 0xFF22D3EE.toInt()
+    }
+    private val frameRect = RectF()
     private val reactiveColors = IntArray(BARS)   // color por barra, recalculado por cuadro
     private var cx = 0f
     private var cy = 0f
@@ -184,6 +192,12 @@ class AudioVisualizerView @JvmOverloads constructor(
     }
 
     fun currentStyle(): Int = style
+
+    /** Marco de neon alrededor del area del visualizador. */
+    fun setFrame(on: Boolean) {
+        frame = on
+        invalidate()
+    }
 
     /**
      * Efecto neon (resplandor). setShadowLayer es CARO en la Mali-400, por eso es
@@ -398,6 +412,7 @@ class AudioVisualizerView @JvmOverloads constructor(
         baseRadius = kotlin.math.min(w, h) * 0.16f
         maxRay = kotlin.math.min(w, h) * 0.32f
         if (style == STYLE_WAVE) barPaint.strokeWidth = h * 0.045f
+        framePaint.strokeWidth = kotlin.math.max(3f, w * 0.006f)
         rebuildShader()
     }
 
@@ -406,7 +421,53 @@ class AudioVisualizerView @JvmOverloads constructor(
         when (style) {
             STYLE_WAVE -> drawWave(canvas)
             STYLE_CIRCLE -> drawCircle(canvas)
+            STYLE_DOTS -> drawDots(canvas)
+            STYLE_MIRROR -> drawMirror(canvas)
             else -> drawBars(canvas)
+        }
+        if (frame) drawFrame(canvas)
+    }
+
+    private fun drawFrame(canvas: Canvas) {
+        val inset = framePaint.strokeWidth
+        frameRect.set(inset, inset, width - inset, height - inset)
+        val r = height * 0.06f
+        if (neon) framePaint.setShadowLayer(framePaint.strokeWidth * 2.2f, 0f, 0f, 0xFF22D3EE.toInt())
+        else framePaint.clearShadowLayer()
+        canvas.drawRoundRect(frameRect, r, r, framePaint)
+    }
+
+    /** Puntos: una esfera por banda que sube y baja como burbuja. */
+    private fun drawDots(canvas: Canvas) {
+        val h = height.toFloat()
+        val radius = barWidth * 0.42f
+        var x = barWidth / 2f
+        for (i in 0 until BARS) {
+            if (reactive != 0) {
+                barPaint.color = reactiveColors[i]
+                if (neon) barPaint.setShadowLayer(radius, 0f, 0f, reactiveColors[i])
+            }
+            val cy = h - (radius + current[i] * (h - radius * 2))
+            canvas.drawCircle(x, cy, radius, barPaint)
+            x += barWidth + gap
+        }
+    }
+
+    /** Espejo: cada barra crece desde el centro hacia arriba y hacia abajo. */
+    private fun drawMirror(canvas: Canvas) {
+        val h = height.toFloat()
+        val mid = h / 2f
+        val minH = h * 0.03f
+        var x = 0f
+        for (i in 0 until BARS) {
+            if (reactive != 0) {
+                barPaint.color = reactiveColors[i]
+                if (neon) barPaint.setShadowLayer(barWidth * 0.9f, 0f, 0f, reactiveColors[i])
+            }
+            val half = max(minH, current[i] * mid)
+            barRect.set(x, mid - half, x + barWidth, mid + half)
+            canvas.drawRoundRect(barRect, corner, corner, barPaint)
+            x += barWidth + gap
         }
     }
 

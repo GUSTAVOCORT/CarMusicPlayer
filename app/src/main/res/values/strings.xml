@@ -36,6 +36,8 @@
     <string name="style_bars">Estilo: Barras</string>
     <string name="style_wave">Estilo: Onda</string>
     <string name="style_circle">Estilo: Circulo</string>
+    <string name="style_dots">Estilo: Puntos</string>
+    <string name="style_mirror">Estilo: Espejo</string>
     <string name="palette_title">Colores de la pantalla</string>
     <string name="cover_desc">Caratula del album</string>
     <string name="settings_title">Ajustes de pantalla</string>

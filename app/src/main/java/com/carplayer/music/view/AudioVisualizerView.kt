@@ -74,6 +74,7 @@ class AudioVisualizerView @JvmOverloads constructor(
     private var style = STYLE_BARS
     private var palette = PALETTE
     private var reactive = 0
+    private var neon = false
     private val reactiveColors = IntArray(BARS)   // color por barra, recalculado por cuadro
     private var cx = 0f
     private var cy = 0f
@@ -183,6 +184,23 @@ class AudioVisualizerView @JvmOverloads constructor(
     }
 
     fun currentStyle(): Int = style
+
+    /**
+     * Efecto neon (resplandor). setShadowLayer es CARO en la Mali-400, por eso es
+     * opcional y viene apagado. Al activarse se desactiva la aceleracion por hardware
+     * de esta vista, porque el blur de sombra no esta soportado en HW en Android viejo.
+     */
+    fun setNeon(on: Boolean) {
+        neon = on
+        if (on) {
+            setLayerType(LAYER_TYPE_SOFTWARE, null)
+            barPaint.setShadowLayer(barWidth.coerceAtLeast(6f) * 0.9f, 0f, 0f, 0xFF22D3EE.toInt())
+        } else {
+            barPaint.clearShadowLayer()
+            setLayerType(LAYER_TYPE_HARDWARE, null)
+        }
+        invalidate()
+    }
 
     /** La Activity avisa si hay musica sonando (para el modo de respaldo). */
     fun setPlaying(playing: Boolean) {
@@ -397,7 +415,10 @@ class AudioVisualizerView @JvmOverloads constructor(
         val minH = h * 0.06f
         var x = 0f
         for (i in 0 until BARS) {
-            if (reactive != 0) barPaint.color = reactiveColors[i]
+            if (reactive != 0) {
+                barPaint.color = reactiveColors[i]
+                if (neon) barPaint.setShadowLayer(barWidth * 0.9f, 0f, 0f, reactiveColors[i])
+            }
             val bh = max(minH, current[i] * h)
             barRect.set(x, h - bh, x + barWidth, h)
             canvas.drawRoundRect(barRect, corner, corner, barPaint)

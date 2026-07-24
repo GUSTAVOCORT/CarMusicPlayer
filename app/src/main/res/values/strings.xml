@@ -38,4 +38,16 @@
     <string name="style_circle">Estilo: Circulo</string>
     <string name="palette_title">Colores de la pantalla</string>
     <string name="cover_desc">Caratula del album</string>
+    <string name="settings_title">Ajustes de pantalla</string>
+    <string name="set_background">Imagen de fondo</string>
+    <string name="set_clock">Reloj Nixie</string>
+    <string name="set_neon">Efecto neon (glow)</string>
+    <string name="bg_from_gallery">Elegir de la galeria</string>
+    <string name="bg_from_usb">Usar fondo.jpg del pendrive</string>
+    <string name="bg_none">Quitar fondo</string>
+    <string name="bg_not_found">No se encontro fondo.jpg en el pendrive</string>
+    <string name="clock_off">Oculto</string>
+    <string name="clock_corner">En la esquina</string>
+    <string name="clock_big">Grande (pantalla completa)</string>
+    <string name="neon_warn">El neon puede ir lento en el equipo del auto</string>
 </resources>

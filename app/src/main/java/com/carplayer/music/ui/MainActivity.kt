@@ -37,6 +37,8 @@ import com.carplayer.music.player.MusicService
 import com.carplayer.music.player.PlaybackStore
 import com.carplayer.music.player.PlayerBus
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.net.Uri
 import com.carplayer.music.scanner.BrowserItem
 import com.carplayer.music.scanner.CoverArt
 import com.carplayer.music.scanner.IndexCache
@@ -54,7 +56,7 @@ import java.util.Locale
 class MainActivity : AppCompatActivity() {
 
     private companion object {
-        const val APP_VERSION = "v4.3"
+        const val APP_VERSION = "v4.4"
         // El canal Binder entre pantalla y servicio revienta pasado ~1 MB por
         // transaccion. 400 pistas entran holgadas: son casi 24 horas de musica.
         const val MAX_QUEUE = 400
@@ -102,6 +104,37 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private val pickImage = registerForActivityResult(
+        ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        if (uri != null) copyBackgroundFromUri(uri)
+    }
+
+    /**
+     * Copia la imagen elegida a un archivo propio de la app.
+     * Asi el fondo sobrevive reinicios sin depender de permisos de URI, que en los
+     * head units chinos suelen revocarse o no persistir.
+     */
+    private fun copyBackgroundFromUri(uri: Uri) {
+        lifecycleScope.launch {
+            val ok = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                try {
+                    val dest = File(filesDir, "user_background.jpg")
+                    contentResolver.openInputStream(uri)?.use { input ->
+                        dest.outputStream().use { output -> input.copyTo(output) }
+                    }
+                    dest.exists() && dest.length() > 0
+                } catch (e: Exception) {
+                    false
+                }
+            }
+            if (ok) {
+                PlaybackStore.setBgUri(this@MainActivity, "file://${File(filesDir, "user_background.jpg").absolutePath}")
+                applyBackground()
+            }
+        }
+    }
+
     private val permLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { result ->
@@ -146,6 +179,10 @@ class MainActivity : AppCompatActivity() {
         b.visualizer.setStyle(PlaybackStore.visualStyle(this))
 
         applyPalette(PlaybackStore.palette(this))
+        applyBackground()
+        applyClock()
+        b.visualizer.setNeon(PlaybackStore.neon(this))
+        b.clock.neon = PlaybackStore.neon(this)
 
         wireControls()
         requestPermissions()
@@ -205,6 +242,7 @@ class MainActivity : AppCompatActivity() {
         PlaybackStore.setScreenMode(this, mode)
         b.coverBackground.visibility =
             if (mode == 2 && b.coverBackground.drawable != null) View.VISIBLE else View.GONE
+        applyClock()
         if (announce) {
             val name = when (mode) {
                 1 -> R.string.mode_wide
@@ -513,6 +551,10 @@ class MainActivity : AppCompatActivity() {
         }
 
         b.btnBrowse.setOnClickListener { showRoot() }
+        b.btnRescan.setOnLongClickListener {
+            showSettingsDialog()
+            true
+        }
         b.btnRescan.setOnClickListener {
             IndexCache.clear(applicationContext)
             b.txtStatus.text = getString(R.string.scanning)
@@ -626,6 +668,158 @@ class MainActivity : AppCompatActivity() {
             }
             .setNegativeButton(android.R.string.cancel, null)
             .show()
+    }
+
+    // ------------------------------------------------------------------ Ajustes de pantalla
+
+    private fun showSettingsDialog() {
+        val options = arrayOf(
+            getString(R.string.set_background),
+            getString(R.string.set_clock),
+            getString(R.string.set_neon)
+        )
+        AlertDialog.Builder(this)
+            .setTitle(R.string.settings_title)
+            .setItems(options) { _, which ->
+                when (which) {
+                    0 -> showBackgroundDialog()
+                    1 -> showClockDialog()
+                    2 -> toggleNeon()
+                }
+            }
+            .show()
+    }
+
+    private fun showBackgroundDialog() {
+        val opts = arrayOf(
+            getString(R.string.bg_from_gallery),
+            getString(R.string.bg_from_usb),
+            getString(R.string.bg_none)
+        )
+        AlertDialog.Builder(this)
+            .setTitle(R.string.set_background)
+            .setItems(opts) { _, which ->
+                when (which) {
+                    0 -> pickImage.launch("image/*")
+                    1 -> useUsbBackground()
+                    2 -> {
+                        PlaybackStore.setBgUri(this, null)
+                        applyBackground()
+                    }
+                }
+            }
+            .show()
+    }
+
+    /** Busca fondo.jpg en las raices tipicas del pendrive (mismas del escaner). */
+    private fun useUsbBackground() {
+        val candidates = listOf(
+            "/storage", "/mnt/usb_storage", "/mnt/usbhost", "/mnt/usbhost1",
+            "/udisk", "/mnt/media_rw", "/mnt/extsd"
+        )
+        val names = listOf("fondo.jpg", "fondo.png", "background.jpg")
+        lifecycleScope.launch {
+            val found = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                for (root in candidates) {
+                    val base = File(root)
+                    val dirs = (base.listFiles()?.filter { it.isDirectory } ?: emptyList()) + base
+                    for (d in dirs) {
+                        for (n in names) {
+                            val f = File(d, n)
+                            if (f.exists() && f.canRead()) return@withContext f.absolutePath
+                        }
+                    }
+                }
+                null
+            }
+            if (found != null) {
+                PlaybackStore.setBgUri(this@MainActivity, "file://$found")
+                applyBackground()
+            } else {
+                Toast.makeText(this@MainActivity, R.string.bg_not_found, Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
+    private fun applyBackground() {
+        val uri = PlaybackStore.bgUri(this)
+        if (uri == null) {
+            b.appBackground.setImageDrawable(null)
+            b.appBackground.visibility = View.GONE
+            b.scrim.visibility = View.GONE
+            return
+        }
+        lifecycleScope.launch {
+            val bmp = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                try {
+                    if (uri.startsWith("file://")) {
+                        // Muestreo para no cargar una foto de 4000px entera en RAM
+                        val path = Uri.parse(uri).path ?: return@withContext null
+                        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                        BitmapFactory.decodeFile(path, bounds)
+                        val opts = BitmapFactory.Options().apply {
+                            inSampleSize = calcSample(bounds.outWidth, bounds.outHeight, 1024)
+                        }
+                        BitmapFactory.decodeFile(path, opts)
+                    } else {
+                        contentResolver.openInputStream(Uri.parse(uri))?.use {
+                            BitmapFactory.decodeStream(it)
+                        }
+                    }
+                } catch (e: Exception) {
+                    null
+                }
+            }
+            if (bmp != null) {
+                b.appBackground.setImageBitmap(bmp)
+                b.appBackground.visibility = View.VISIBLE
+                b.scrim.visibility = View.VISIBLE
+            }
+        }
+    }
+
+    private fun calcSample(w: Int, h: Int, target: Int): Int {
+        var sample = 1
+        var mx = maxOf(w, h)
+        while (mx / 2 >= target) {
+            mx /= 2
+            sample *= 2
+        }
+        return sample
+    }
+
+    private fun showClockDialog() {
+        val opts = arrayOf(
+            getString(R.string.clock_off),
+            getString(R.string.clock_corner),
+            getString(R.string.clock_big)
+        )
+        AlertDialog.Builder(this)
+            .setTitle(R.string.set_clock)
+            .setSingleChoiceItems(opts, PlaybackStore.clockPos(this)) { dialog, which ->
+                PlaybackStore.setClockPos(this, which)
+                applyClock()
+                dialog.dismiss()
+            }
+            .show()
+    }
+
+    private fun applyClock() {
+        val pos = PlaybackStore.clockPos(this)
+        b.clock.visibility = if (pos == 0) View.GONE else View.VISIBLE
+        // pos 2 = grande: se agranda cuando entra a pantalla completa (ver applyScreenMode)
+        val big = pos == 2 && screenMode == 2
+        val h = (if (big) 90 else 44) * resources.displayMetrics.density
+        b.clock.layoutParams = b.clock.layoutParams.apply { height = h.toInt() }
+        b.clock.requestLayout()
+    }
+
+    private fun toggleNeon() {
+        val on = !PlaybackStore.neon(this)
+        PlaybackStore.setNeon(this, on)
+        b.visualizer.setNeon(on)
+        b.clock.neon = on
+        if (on) Toast.makeText(this, R.string.neon_warn, Toast.LENGTH_LONG).show()
     }
 
     // ------------------------------------------------------------------ Colores

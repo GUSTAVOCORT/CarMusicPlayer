@@ -2,6 +2,7 @@ package com.carplayer.music.ui
 
 import android.view.LayoutInflater
 import android.view.ViewGroup
+import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
@@ -73,6 +74,16 @@ class BrowserAdapter(
     private fun applyHighlight(holder: VH, item: BrowserItem) {
         val active = item is BrowserItem.Track && item.song.path == playingPath
         holder.b.root.isActivated = active
+        // La cancion que suena tambien resalta en el texto y el icono
+        val ctx = holder.itemView.context
+        if (active) {
+            val accent = ContextCompat.getColor(ctx, R.color.accent)
+            holder.b.title.setTextColor(accent)
+            holder.b.icon.setColorFilter(accent)
+        } else {
+            holder.b.title.setTextColor(ContextCompat.getColor(ctx, R.color.text_primary))
+            holder.b.icon.setColorFilter(ContextCompat.getColor(ctx, R.color.accent))
+        }
     }
 
     companion object {

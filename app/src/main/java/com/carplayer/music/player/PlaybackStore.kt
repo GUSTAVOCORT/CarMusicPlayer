@@ -22,6 +22,9 @@ object PlaybackStore {
     private const val K_RESTORE_PENDING = "restore_pending"
     private const val K_VIS_STYLE = "vis_style"
     private const val K_PALETTE = "palette"
+    private const val K_BG_URI = "bg_uri"
+    private const val K_CLOCK = "clock_pos"
+    private const val K_NEON = "neon"
 
     const val SOURCE_ALL = "ALL"
 
@@ -97,6 +100,24 @@ object PlaybackStore {
 
     fun setPalette(c: Context, index: Int) {
         prefs(c).edit().putInt(K_PALETTE, index).apply()
+    }
+
+    /** Ruta o URI de la imagen de fondo elegida por el usuario. null = sin fondo. */
+    fun bgUri(c: Context): String? = prefs(c).getString(K_BG_URI, null)
+    fun setBgUri(c: Context, uri: String?) {
+        prefs(c).edit().apply { if (uri == null) remove(K_BG_URI) else putString(K_BG_URI, uri) }.apply()
+    }
+
+    /** Posicion del reloj: 0 oculto, 1 esquina, 2 grande (pantalla completa). */
+    fun clockPos(c: Context): Int = prefs(c).getInt(K_CLOCK, 1)
+    fun setClockPos(c: Context, pos: Int) {
+        prefs(c).edit().putInt(K_CLOCK, pos).apply()
+    }
+
+    /** Efecto neon (glow). Apagado por defecto por el costo en la Mali-400. */
+    fun neon(c: Context): Boolean = prefs(c).getBoolean(K_NEON, false)
+    fun setNeon(c: Context, on: Boolean) {
+        prefs(c).edit().putBoolean(K_NEON, on).apply()
     }
 
     /** Estilo del visualizador: 0 barras, 1 onda, 2 circulo. */

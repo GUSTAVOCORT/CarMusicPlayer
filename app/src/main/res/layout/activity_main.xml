@@ -9,6 +9,33 @@
     android:background="@color/bg"
     android:padding="12dp">
 
+    <!-- Imagen de fondo elegida por el usuario. Lo mas atras de todo. -->
+    <ImageView
+        android:id="@+id/appBackground"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:layout_margin="-12dp"
+        android:contentDescription="@null"
+        android:scaleType="centerCrop"
+        android:visibility="gone"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <!-- Velo oscuro para que el texto se lea sobre cualquier foto -->
+    <View
+        android:id="@+id/scrim"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:layout_margin="-12dp"
+        android:background="#99000000"
+        android:visibility="gone"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
     <!-- Caratula de fondo (solo visible en pantalla completa). Detras de todo. -->
     <ImageView
         android:id="@+id/coverBackground"
@@ -32,6 +59,15 @@
         app:layout_constraintGuide_percent="0.56" />
 
     <!-- ==================== PANEL IZQUIERDO: reproduccion ==================== -->
+
+    <com.carplayer.music.view.NixieClockView
+        android:id="@+id/clock"
+        android:layout_width="150dp"
+        android:layout_height="44dp"
+        android:visibility="gone"
+        app:layout_constraintEnd_toStartOf="@id/gl_split"
+        app:layout_constraintTop_toTopOf="parent"
+        tools:visibility="visible" />
 
     <ImageView
         android:id="@+id/coverArt"

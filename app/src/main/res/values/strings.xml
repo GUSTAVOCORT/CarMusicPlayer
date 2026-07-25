@@ -53,6 +53,8 @@
     <string name="bg_from_usb">Usar fondo.jpg del pendrive</string>
     <string name="bg_none">Quitar fondo</string>
     <string name="bg_not_found">No se encontro fondo.jpg en el pendrive</string>
+    <string name="no_gallery">Este equipo no tiene galeria. Usa fondo.jpg en el pendrive.</string>
+    <string name="bg_loaded">Fondo cargado</string>
     <string name="clock_off">Oculto</string>
     <string name="clock_corner">En la esquina</string>
     <string name="clock_big">Grande (pantalla completa)</string>

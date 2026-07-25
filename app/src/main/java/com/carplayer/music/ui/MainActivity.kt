@@ -56,7 +56,7 @@ import java.util.Locale
 class MainActivity : AppCompatActivity() {
 
     private companion object {
-        const val APP_VERSION = "v4.9"
+        const val APP_VERSION = "v4.9.2"
         // El canal Binder entre pantalla y servicio revienta pasado ~1 MB por
         // transaccion. 400 pistas entran holgadas: son casi 24 horas de musica.
         const val MAX_QUEUE = 400
@@ -205,6 +205,9 @@ class MainActivity : AppCompatActivity() {
     private fun buildConstraintSets() {
         if (setsReady) return
         setNormal.clone(b.root)
+        // Quitamos el fondo y el velo del control de los sets: su visibilidad la
+        // decide applyBackground/applyScreenMode, no el modo de pantalla.
+        // (se aplica a los tres sets mas abajo tras clonar)
 
         // Modo "sin lista": la guia se corre al 100 % y el panel derecho desaparece,
         // asi el visualizador ocupa todo el ancho.
@@ -238,6 +241,13 @@ class MainActivity : AppCompatActivity() {
         setFull.connect(R.id.visualizer, ConstraintSet.START, ConstraintSet.PARENT_ID, ConstraintSet.START, 0)
         setFull.connect(R.id.visualizer, ConstraintSet.END, ConstraintSet.PARENT_ID, ConstraintSet.END, 0)
 
+        // En los tres sets, la visibilidad de fondo/velo se deja "sin cambio" respecto
+        // al estado actual, evitando que un cambio de modo los apague.
+        val bgVis = if (b.appBackground.drawable != null) ConstraintSet.VISIBLE else ConstraintSet.GONE
+        listOf(setNormal, setWide, setFull).forEach {
+            it.setVisibility(R.id.appBackground, bgVis)
+            it.setVisibility(R.id.scrim, bgVis)
+        }
         setsReady = true
     }
 
@@ -280,6 +290,11 @@ class MainActivity : AppCompatActivity() {
         PlaybackStore.setScreenMode(this, mode)
         b.coverBackground.visibility =
             if (mode == 2 && b.coverBackground.drawable != null) View.VISIBLE else View.GONE
+        // El fondo del usuario NO depende del modo: se mantiene en las 3 vistas.
+        // Los ConstraintSet lo habrian ocultado, asi que lo reafirmamos aca.
+        val hasBg = b.appBackground.drawable != null
+        b.appBackground.visibility = if (hasBg) View.VISIBLE else View.GONE
+        b.scrim.visibility = if (hasBg) View.VISIBLE else View.GONE
         applyClock()
         if (announce) {
             val name = when (mode) {
@@ -743,7 +758,7 @@ class MainActivity : AppCompatActivity() {
             .setTitle(R.string.set_background)
             .setItems(opts) { _, which ->
                 when (which) {
-                    0 -> pickImage.launch("image/*")
+                    0 -> launchGalleryPicker()
                     1 -> useUsbBackground()
                     2 -> {
                         PlaybackStore.setBgUri(this, null)
@@ -754,30 +769,54 @@ class MainActivity : AppCompatActivity() {
             .show()
     }
 
+    /**
+     * Abre el selector de imagenes del sistema.
+     * En los head units chinos no hay galeria ni selector, asi que el intent no tiene
+     * quien lo atienda: lo capturamos y avisamos en vez de dejar que la app se caiga.
+     */
+    private fun launchGalleryPicker() {
+        try {
+            pickImage.launch("image/*")
+        } catch (e: android.content.ActivityNotFoundException) {
+            Toast.makeText(this, R.string.no_gallery, Toast.LENGTH_LONG).show()
+        } catch (e: Exception) {
+            Toast.makeText(this, R.string.no_gallery, Toast.LENGTH_LONG).show()
+        }
+    }
+
     /** Busca fondo.jpg en las raices tipicas del pendrive (mismas del escaner). */
     private fun useUsbBackground() {
         val candidates = listOf(
             "/storage", "/mnt/usb_storage", "/mnt/usbhost", "/mnt/usbhost1",
-            "/udisk", "/mnt/media_rw", "/mnt/extsd"
+            "/udisk", "/mnt/media_rw", "/mnt/extsd", "/mnt/sdcard", "/sdcard"
         )
-        val names = listOf("fondo.jpg", "fondo.png", "background.jpg")
+        val names = listOf("fondo.jpg", "fondo.png", "fondo.jpeg", "background.jpg", "background.png")
         lifecycleScope.launch {
             val found = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                for (root in candidates) {
-                    val base = File(root)
-                    val dirs = (base.listFiles()?.filter { it.isDirectory } ?: emptyList()) + base
-                    for (d in dirs) {
-                        for (n in names) {
-                            val f = File(d, n)
-                            if (f.exists() && f.canRead()) return@withContext f.absolutePath
+                try {
+                    for (root in candidates) {
+                        val base = File(root)
+                        if (!base.canRead()) continue
+                        // La raiz, sus subcarpetas directas, y las sub-subcarpetas (2 niveles)
+                        val level1 = base.listFiles()?.filter { it.isDirectory && it.canRead() } ?: emptyList()
+                        val level2 = level1.flatMap { it.listFiles()?.filter { d -> d.isDirectory && d.canRead() } ?: emptyList() }
+                        val dirs = listOf(base) + level1 + level2
+                        for (d in dirs) {
+                            for (n in names) {
+                                val f = File(d, n)
+                                if (f.exists() && f.canRead() && f.length() > 0) return@withContext f.absolutePath
+                            }
                         }
                     }
+                } catch (e: Exception) {
+                    // Cualquier ruta protegida se ignora en vez de tumbar la app
                 }
                 null
             }
             if (found != null) {
                 PlaybackStore.setBgUri(this@MainActivity, "file://$found")
                 applyBackground()
+                Toast.makeText(this@MainActivity, R.string.bg_loaded, Toast.LENGTH_SHORT).show()
             } else {
                 Toast.makeText(this@MainActivity, R.string.bg_not_found, Toast.LENGTH_LONG).show()
             }
@@ -790,6 +829,7 @@ class MainActivity : AppCompatActivity() {
             b.appBackground.setImageDrawable(null)
             b.appBackground.visibility = View.GONE
             b.scrim.visibility = View.GONE
+            refreshBackgroundInSets(false)
             return
         }
         lifecycleScope.launch {
@@ -817,7 +857,18 @@ class MainActivity : AppCompatActivity() {
                 b.appBackground.setImageBitmap(bmp)
                 b.appBackground.visibility = View.VISIBLE
                 b.scrim.visibility = View.VISIBLE
+                refreshBackgroundInSets(true)
             }
+        }
+    }
+
+    /** Mantiene la visibilidad del fondo coherente en los tres modos de pantalla. */
+    private fun refreshBackgroundInSets(visible: Boolean) {
+        if (!setsReady) return
+        val v = if (visible) ConstraintSet.VISIBLE else ConstraintSet.GONE
+        listOf(setNormal, setWide, setFull).forEach {
+            it.setVisibility(R.id.appBackground, v)
+            it.setVisibility(R.id.scrim, v)
         }
     }
 

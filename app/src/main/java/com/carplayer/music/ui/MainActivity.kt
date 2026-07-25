@@ -56,7 +56,7 @@ import java.util.Locale
 class MainActivity : AppCompatActivity() {
 
     private companion object {
-        const val APP_VERSION = "v4.9.2"
+        const val APP_VERSION = "v5.1"
         // El canal Binder entre pantalla y servicio revienta pasado ~1 MB por
         // transaccion. 400 pistas entran holgadas: son casi 24 horas de musica.
         const val MAX_QUEUE = 400
@@ -131,6 +131,9 @@ class MainActivity : AppCompatActivity() {
             if (ok) {
                 PlaybackStore.setBgUri(this@MainActivity, "file://${File(filesDir, "user_background.jpg").absolutePath}")
                 applyBackground()
+                Toast.makeText(this@MainActivity, R.string.bg_ok, Toast.LENGTH_SHORT).show()
+            } else {
+                Toast.makeText(this@MainActivity, R.string.bg_copy_fail, Toast.LENGTH_LONG).show()
             }
         }
     }
@@ -759,7 +762,7 @@ class MainActivity : AppCompatActivity() {
             .setItems(opts) { _, which ->
                 when (which) {
                     0 -> launchGalleryPicker()
-                    1 -> useUsbBackground()
+                    1 -> pickImageFromUsb()
                     2 -> {
                         PlaybackStore.setBgUri(this, null)
                         applyBackground()
@@ -784,46 +787,87 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    /** Busca fondo.jpg en las raices tipicas del pendrive (mismas del escaner). */
-    private fun useUsbBackground() {
-        val candidates = listOf(
-            "/storage", "/mnt/usb_storage", "/mnt/usbhost", "/mnt/usbhost1",
-            "/udisk", "/mnt/media_rw", "/mnt/extsd", "/mnt/sdcard", "/sdcard"
+    /**
+     * Escanea el pendrive y muestra TODAS las imagenes JPG/PNG que encuentre,
+     * para que el usuario elija cualquiera sin tener que renombrarla.
+     */
+    private fun pickImageFromUsb() {
+        val roots = listOf(
+            "/storage", "/mnt", "/mnt/media_rw", "/mnt/usb_storage",
+            "/mnt/usbhost", "/mnt/usbhost1", "/mnt/usbhost2", "/mnt/usb",
+            "/mnt/sdcard/usbStorageA", "/mnt/extsd", "/udisk", "/usbdisk",
+            "/mnt/usb_storage1", "/storage/usb", "/storage/usbotg"
         )
-        val names = listOf("fondo.jpg", "fondo.png", "fondo.jpeg", "background.jpg", "background.png")
+        val exts = setOf("jpg", "jpeg", "png", "bmp")
+
         lifecycleScope.launch {
-            val found = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                try {
-                    for (root in candidates) {
-                        val base = File(root)
-                        if (!base.canRead()) continue
-                        // La raiz, sus subcarpetas directas, y las sub-subcarpetas (2 niveles)
-                        val level1 = base.listFiles()?.filter { it.isDirectory && it.canRead() } ?: emptyList()
-                        val level2 = level1.flatMap { it.listFiles()?.filter { d -> d.isDirectory && d.canRead() } ?: emptyList() }
-                        val dirs = listOf(base) + level1 + level2
-                        for (d in dirs) {
-                            for (n in names) {
-                                val f = File(d, n)
-                                if (f.exists() && f.canRead() && f.length() > 0) return@withContext f.absolutePath
+            b.txtStatus.text = getString(R.string.bg_searching)
+            val images = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                val found = LinkedHashMap<String, String>()   // ruta -> nombre a mostrar
+                val seenDirs = HashSet<String>()
+
+                fun scanDir(dir: File, depth: Int) {
+                    if (depth > 4 || found.size >= 200) return
+                    val canon = try { dir.canonicalPath } catch (e: Exception) { dir.absolutePath }
+                    if (!seenDirs.add(canon)) return
+                    val kids = try { dir.listFiles() } catch (e: Exception) { null } ?: return
+                    for (f in kids) {
+                        if (found.size >= 200) return
+                        val name = f.name
+                        if (name.startsWith(".")) continue
+                        if (f.isDirectory) {
+                            val low = name.lowercase()
+                            if (low == "android" || low == "lost.dir") continue
+                            if (f.canRead()) scanDir(f, depth + 1)
+                        } else {
+                            val ext = name.substringAfterLast('.', "").lowercase()
+                            if (ext in exts && f.length() > 1024 && f.canRead()) {
+                                found[f.absolutePath] = "$name  (${f.parentFile?.name ?: ""})"
                             }
                         }
                     }
-                } catch (e: Exception) {
-                    // Cualquier ruta protegida se ignora en vez de tumbar la app
                 }
-                null
+
+                for (root in roots) {
+                    val base = File(root)
+                    if (base.isDirectory && base.canRead()) scanDir(base, 0)
+                }
+                found
             }
-            if (found != null) {
-                PlaybackStore.setBgUri(this@MainActivity, "file://$found")
-                applyBackground()
-                Toast.makeText(this@MainActivity, R.string.bg_loaded, Toast.LENGTH_SHORT).show()
-            } else {
-                Toast.makeText(this@MainActivity, R.string.bg_not_found, Toast.LENGTH_LONG).show()
+
+            restoreStatus()
+
+            if (images.isEmpty()) {
+                AlertDialog.Builder(this@MainActivity)
+                    .setTitle(R.string.bg_not_found)
+                    .setMessage(R.string.bg_no_images)
+                    .setPositiveButton(android.R.string.ok, null)
+                    .show()
+                return@launch
             }
+
+            val paths = images.keys.toList()
+            val labels = images.values.toTypedArray()
+            AlertDialog.Builder(this@MainActivity)
+                .setTitle(getString(R.string.bg_pick, images.size))
+                .setItems(labels) { _, which ->
+                    PlaybackStore.setBgUri(this@MainActivity, "file://${paths[which]}")
+                    applyBackground()
+                }
+                .setNegativeButton(android.R.string.cancel, null)
+                .show()
         }
     }
 
-    private fun applyBackground() {
+    private fun restoreStatus() {
+        if (MusicIndex.all.isNotEmpty()) {
+            b.txtStatus.text = getString(R.string.status_line,
+                APP_VERSION, MusicIndex.all.size, MusicIndex.byFolder.size,
+                getString(R.string.from_cache))
+        }
+    }
+
+        private fun applyBackground() {
         val uri = PlaybackStore.bgUri(this)
         if (uri == null) {
             b.appBackground.setImageDrawable(null)

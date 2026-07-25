@@ -56,7 +56,7 @@ import java.util.Locale
 class MainActivity : AppCompatActivity() {
 
     private companion object {
-        const val APP_VERSION = "v5.1"
+        const val APP_VERSION = "v5.2"
         // El canal Binder entre pantalla y servicio revienta pasado ~1 MB por
         // transaccion. 400 pistas entran holgadas: son casi 24 horas de musica.
         const val MAX_QUEUE = 400
@@ -792,13 +792,22 @@ class MainActivity : AppCompatActivity() {
      * para que el usuario elija cualquiera sin tener que renombrarla.
      */
     private fun pickImageFromUsb() {
-        val roots = listOf(
+        val fixedRoots = listOf(
             "/storage", "/mnt", "/mnt/media_rw", "/mnt/usb_storage",
             "/mnt/usbhost", "/mnt/usbhost1", "/mnt/usbhost2", "/mnt/usb",
             "/mnt/sdcard/usbStorageA", "/mnt/extsd", "/udisk", "/usbdisk",
             "/mnt/usb_storage1", "/storage/usb", "/storage/usbotg"
         )
+        // Las carpetas donde el escaner de musica YA encontro canciones son las
+        // rutas reales del pendrive: las usamos como puntos de partida seguros.
+        val musicRoots = MusicIndex.all.asSequence()
+            .mapNotNull { File(it.folderPath).parentFile?.parentFile?.absolutePath }
+            .distinct().take(20).toList()
+        val roots = (musicRoots + fixedRoots).distinct()
+
         val exts = setOf("jpg", "jpeg", "png", "bmp")
+        val ownCache = cacheDir.absolutePath
+        val ownFiles = filesDir.absolutePath
 
         lifecycleScope.launch {
             b.txtStatus.text = getString(R.string.bg_searching)
@@ -807,22 +816,26 @@ class MainActivity : AppCompatActivity() {
                 val seenDirs = HashSet<String>()
 
                 fun scanDir(dir: File, depth: Int) {
-                    if (depth > 4 || found.size >= 200) return
+                    if (depth > 6 || found.size >= 300) return
                     val canon = try { dir.canonicalPath } catch (e: Exception) { dir.absolutePath }
+                    // No escanear el almacenamiento interno de la app: ahi viven las
+                    // caratulas cacheadas y el fondo copiado, no son del pendrive.
+                    if (canon.startsWith(ownCache) || canon.startsWith(ownFiles)) return
                     if (!seenDirs.add(canon)) return
                     val kids = try { dir.listFiles() } catch (e: Exception) { null } ?: return
                     for (f in kids) {
-                        if (found.size >= 200) return
+                        if (found.size >= 300) return
                         val name = f.name
                         if (name.startsWith(".")) continue
                         if (f.isDirectory) {
                             val low = name.lowercase()
-                            if (low == "android" || low == "lost.dir") continue
+                            if (low == "android" || low == "lost.dir" || low == "data" || low == "obb") continue
                             if (f.canRead()) scanDir(f, depth + 1)
                         } else {
                             val ext = name.substringAfterLast('.', "").lowercase()
                             if (ext in exts && f.length() > 1024 && f.canRead()) {
-                                found[f.absolutePath] = "$name  (${f.parentFile?.name ?: ""})"
+                                val parent = f.parentFile?.absolutePath ?: ""
+                                found[f.absolutePath] = "$name\n$parent"
                             }
                         }
                     }

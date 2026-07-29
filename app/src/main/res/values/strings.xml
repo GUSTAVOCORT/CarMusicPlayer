@@ -47,6 +47,8 @@
     <string name="set_clock">Reloj Nixie</string>
     <string name="set_neon">Efecto neon (glow)</string>
     <string name="set_autocolor">Colores automaticos por cancion</string>
+    <string name="set_autostyle">Efectos automaticos por cancion</string>
+    <string name="set_blink">Titileo neon en el texto</string>
     <string name="on">ON</string>
     <string name="off">OFF</string>
     <string name="bg_from_gallery">Elegir de la galeria</string>
@@ -68,4 +70,5 @@
     <string name="clock_corner">En la esquina</string>
     <string name="clock_big">Grande (pantalla completa)</string>
     <string name="neon_warn">El neon puede ir lento en el equipo del auto</string>
+    <string name="style_prefix">Estilo:</string>
 </resources>

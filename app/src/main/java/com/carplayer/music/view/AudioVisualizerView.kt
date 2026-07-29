@@ -42,14 +42,28 @@ class AudioVisualizerView @JvmOverloads constructor(
         private const val SILENCE_TIMEOUT_MS = 1500L
 
         /** Estilos de dibujo. El espectro es el mismo: cambia solo como se pinta. */
-        const val STYLE_BARS = 0
-        const val STYLE_WAVE = 1
-        const val STYLE_CIRCLE = 2
-        const val STYLE_DOTS = 3
-        const val STYLE_MIRROR = 4
-        const val STYLE_BLOCKS = 5
-        const val STYLE_LINE = 6
-        const val STYLE_COUNT = 7
+        // 16 estilos, en el orden pedido por el usuario
+        const val STYLE_LED_SEG = 0     // Segmentos LED con reflejo
+        const val STYLE_BARS = 1        // Barras solidas
+        const val STYLE_MIRROR = 2      // Espejo (reflejo desde el centro vertical)
+        const val STYLE_LINE = 3        // Linea (contorno del espectro)
+        const val STYLE_DOTS = 4        // Puntos (circulos)
+        const val STYLE_FILLED = 5      // Onda rellena hacia abajo
+        const val STYLE_PEAK = 6        // Barras con pico (peak hold)
+        const val STYLE_LED_FLAT = 7    // LED plano sin reflejo
+        const val STYLE_RAINBOW = 8     // Arcoiris horizontal
+        const val STYLE_RADIAL = 9      // Radial circular
+        const val STYLE_MATRIX = 10     // Matriz LED con degradado y reflejo
+        const val STYLE_DOTGRID = 11    // Puntos grid por columna
+        const val STYLE_WAVE_MIRROR = 12// Onda espejo horizontal con glow
+        const val STYLE_CENTER = 13     // Barras crecen desde el centro
+        const val STYLE_FLAMES = 14     // Llamas
+        const val STYLE_PULSE = 15      // Ondas latido (circulos concentricos)
+        const val STYLE_WATER = 16      // Ondas que salen del centro como agua
+        const val STYLE_STARS = 17      // Estrellas que titilan
+        const val STYLE_SPIRAL = 18     // Espiral que gira
+        const val STYLE_PARTICLES = 19  // Particulas que reaccionan
+        const val STYLE_COUNT = 20
 
         /** Paleta neon repartida a lo ancho: graves cian -> agudos violeta. */
         private val PALETTE = intArrayOf(
@@ -108,6 +122,13 @@ class AudioVisualizerView @JvmOverloads constructor(
     private var syntheticMode = false
     private val phase = FloatArray(BARS) { it * 0.7f }
     private var audioPlaying = false
+
+    // Estado para estrellas / particulas / espiral (fijo, sin asignaciones por cuadro)
+    private var spin = 0f
+    private val starX = FloatArray(40)
+    private val starY = FloatArray(40)
+    private val starPhase = FloatArray(40) { (it * 0.37f) }
+    private var starsReady = false
 
     /**
      * Cambia la paleta del visualizador.
@@ -181,7 +202,8 @@ class AudioVisualizerView @JvmOverloads constructor(
     /** Cambia el estilo de dibujo. Devuelve el estilo aplicado. */
     fun setStyle(newStyle: Int): Int {
         style = ((newStyle % STYLE_COUNT) + STYLE_COUNT) % STYLE_COUNT
-        if (style == STYLE_WAVE) {
+        starsReady = false
+        if (style == STYLE_WAVE_MIRROR) {
             barPaint.style = Paint.Style.STROKE
             barPaint.strokeWidth = height * 0.045f
             barPaint.strokeJoin = Paint.Join.ROUND
@@ -421,7 +443,7 @@ class AudioVisualizerView @JvmOverloads constructor(
         cy = h / 2f
         baseRadius = kotlin.math.min(w, h) * 0.16f
         maxRay = kotlin.math.min(w, h) * 0.32f
-        if (style == STYLE_WAVE) barPaint.strokeWidth = h * 0.045f
+        if (style == STYLE_WAVE_MIRROR) barPaint.strokeWidth = h * 0.045f
         framePaint.strokeWidth = kotlin.math.max(3f, w * 0.006f)
         rebuildShader()
     }
@@ -429,15 +451,147 @@ class AudioVisualizerView @JvmOverloads constructor(
     override fun onDraw(canvas: Canvas) {
         if (reactive != 0) computeReactiveColors()
         when (style) {
-            STYLE_WAVE -> drawWave(canvas)
-            STYLE_CIRCLE -> drawCircle(canvas)
-            STYLE_DOTS -> drawDots(canvas)
+            STYLE_LED_SEG -> drawLed(canvas, reflect = true, gradient = false)
             STYLE_MIRROR -> drawMirror(canvas)
-            STYLE_BLOCKS -> drawBlocks(canvas)
             STYLE_LINE -> drawLine(canvas)
+            STYLE_DOTS -> drawDots(canvas)
+            STYLE_FILLED -> drawFilled(canvas)
+            STYLE_PEAK -> drawBars(canvas, withPeak = true)
+            STYLE_LED_FLAT -> drawLed(canvas, reflect = false, gradient = false)
+            STYLE_RAINBOW -> drawRainbow(canvas)
+            STYLE_RADIAL -> drawCircle(canvas)
+            STYLE_MATRIX -> drawLed(canvas, reflect = true, gradient = true)
+            STYLE_DOTGRID -> drawDotGrid(canvas)
+            STYLE_WAVE_MIRROR -> drawWave(canvas)
+            STYLE_CENTER -> drawMirror(canvas)
+            STYLE_FLAMES -> drawFlames(canvas)
+            STYLE_PULSE -> drawPulse(canvas)
+            STYLE_WATER -> drawWater(canvas)
+            STYLE_STARS -> drawStars(canvas)
+            STYLE_SPIRAL -> drawSpiral(canvas)
+            STYLE_PARTICLES -> drawParticles(canvas)
             else -> drawBars(canvas)
         }
         if (frame) drawFrame(canvas)
+    }
+
+    /** Ondas que salen del centro como agua: circulos suaves que se expanden. */
+    private fun drawWater(canvas: Canvas) {
+        var energy = 0f
+        for (i in 0 until BARS) energy += current[i]
+        energy /= BARS
+        spin += 0.02f + energy * 0.06f
+        val cxp = width / 2f
+        val cyp = height / 2f
+        val maxR = kotlin.math.min(width, height) * 0.5f
+        val old = barPaint.style
+        barPaint.style = Paint.Style.STROKE
+        barPaint.strokeWidth = kotlin.math.max(2f, maxR * 0.015f)
+        val rings = 7
+        for (r in 0 until rings) {
+            val base = ((r / rings.toFloat()) + spin * 0.15f) % 1f
+            val radius = maxR * base
+            val bandVal = current[(r * BARS / rings).coerceIn(0, BARS - 1)]
+            val rr = radius * (1f + bandVal * 0.25f)
+            barPaint.color = if (reactive != 0) reactiveColors[(r * BARS / rings).coerceIn(0, BARS - 1)]
+                             else sampleRamp(palette, base)
+            barPaint.alpha = (200 * (1f - base)).toInt().coerceIn(25, 220)
+            if (neon) barPaint.setShadowLayer(barPaint.strokeWidth * 3f, 0f, 0f, barPaint.color)
+            canvas.drawCircle(cxp, cyp, rr, barPaint)
+        }
+        barPaint.alpha = 255
+        barPaint.style = old
+        if (reactive == 0) rebuildShader()
+    }
+
+    /** Estrellas que titilan: puntos fijos cuyo brillo late con las bandas. */
+    private fun drawStars(canvas: Canvas) {
+        if (!starsReady && width > 0) {
+            val rnd = java.util.Random(12345)   // posiciones estables entre cuadros
+            for (k in starX.indices) {
+                starX[k] = rnd.nextFloat() * width
+                starY[k] = rnd.nextFloat() * height
+            }
+            starsReady = true
+        }
+        val old = barPaint.style
+        barPaint.style = Paint.Style.FILL
+        for (k in starX.indices) {
+            starPhase[k] += 0.05f + (k % 4) * 0.01f
+            val band = current[k % BARS]
+            val twinkle = (kotlin.math.sin(starPhase[k].toDouble()).toFloat() * 0.5f + 0.5f)
+            val bright = (0.25f + band * 0.75f) * (0.4f + twinkle * 0.6f)
+            val radius = (2f + band * 8f) * (0.6f + twinkle * 0.4f)
+            barPaint.color = if (reactive != 0) reactiveColors[k % BARS]
+                             else sampleRamp(palette, twinkle)
+            barPaint.alpha = (255 * bright).toInt().coerceIn(20, 255)
+            if (neon) barPaint.setShadowLayer(radius * 1.5f, 0f, 0f, barPaint.color)
+            canvas.drawCircle(starX[k], starY[k], radius, barPaint)
+        }
+        barPaint.alpha = 255
+        barPaint.style = old
+        if (reactive == 0) rebuildShader()
+    }
+
+    /** Espiral que gira: puntos en brazo espiral, el radio late con la banda. */
+    private fun drawSpiral(canvas: Canvas) {
+        var energy = 0f
+        for (i in 0 until BARS) energy += current[i]
+        energy /= BARS
+        spin += 0.03f + energy * 0.08f
+        val cxp = width / 2f
+        val cyp = height / 2f
+        val maxR = kotlin.math.min(width, height) * 0.46f
+        val old = barPaint.style
+        barPaint.style = Paint.Style.FILL
+        val points = BARS * 2
+        for (k in 0 until points) {
+            val t = k / points.toFloat()
+            val angle = t * 6.28318f * 3f + spin      // 3 vueltas
+            val band = current[k % BARS]
+            val radius = maxR * t * (0.7f + band * 0.6f)
+            val px = cxp + kotlin.math.cos(angle.toDouble()).toFloat() * radius
+            val py = cyp + kotlin.math.sin(angle.toDouble()).toFloat() * radius
+            val dotR = (2f + band * 7f)
+            barPaint.color = if (reactive != 0) reactiveColors[k % BARS] else sampleRamp(palette, t)
+            if (neon) barPaint.setShadowLayer(dotR * 1.5f, 0f, 0f, barPaint.color)
+            canvas.drawCircle(px, py, dotR, barPaint)
+        }
+        barPaint.style = old
+        if (reactive == 0) rebuildShader()
+    }
+
+    /** Particulas: suben desde abajo segun la energia, como chispas. */
+    private fun drawParticles(canvas: Canvas) {
+        if (!starsReady && width > 0) {
+            val rnd = java.util.Random(999)
+            for (k in starX.indices) {
+                starX[k] = rnd.nextFloat() * width
+                starY[k] = rnd.nextFloat()          // 0..1 = altura relativa
+            }
+            starsReady = true
+        }
+        var energy = 0f
+        for (i in 0 until BARS) energy += current[i]
+        energy /= BARS
+        val h = height.toFloat()
+        val old = barPaint.style
+        barPaint.style = Paint.Style.FILL
+        for (k in starX.indices) {
+            // sube segun energia; al pasar arriba, reaparece abajo
+            starY[k] -= (0.004f + energy * 0.03f) * (0.5f + (k % 5) * 0.15f)
+            if (starY[k] < 0f) starY[k] += 1f
+            val band = current[k % BARS]
+            val py = starY[k] * h
+            val radius = 2f + band * 9f
+            barPaint.color = if (reactive != 0) reactiveColors[k % BARS] else sampleRamp(palette, 1f - starY[k])
+            barPaint.alpha = (255 * (0.4f + band * 0.6f)).toInt().coerceIn(30, 255)
+            if (neon) barPaint.setShadowLayer(radius * 1.4f, 0f, 0f, barPaint.color)
+            canvas.drawCircle(starX[k], py, radius, barPaint)
+        }
+        barPaint.alpha = 255
+        barPaint.style = old
+        if (reactive == 0) rebuildShader()
     }
 
     private fun drawFrame(canvas: Canvas) {
@@ -483,7 +637,7 @@ class AudioVisualizerView @JvmOverloads constructor(
         }
     }
 
-    private fun drawBars(canvas: Canvas) {
+    private fun drawBars(canvas: Canvas, withPeak: Boolean = false) {
         val h = height.toFloat()
         val minH = h * 0.06f
         var x = 0f
@@ -496,14 +650,164 @@ class AudioVisualizerView @JvmOverloads constructor(
             barRect.set(x, h - bh, x + barWidth, h)
             canvas.drawRoundRect(barRect, corner, corner, barPaint)
 
-            val p = peak[i]
-            if (p > 0.03f) {
-                val py = h - p * h
-                barRect.set(x, py, x + barWidth, py + minH)
-                canvas.drawRoundRect(barRect, corner, corner, peakPaint)
+            if (withPeak) {
+                val p = peak[i]
+                if (p > 0.03f) {
+                    val py = h - p * h
+                    barRect.set(x, py, x + barWidth, py + minH)
+                    canvas.drawRoundRect(barRect, corner, corner, peakPaint)
+                }
             }
             x += barWidth + gap
         }
+    }
+
+    /** LED apilado. reflect = reflejo tenue abajo; gradient = degradado vertical. */
+    private fun drawLed(canvas: Canvas, reflect: Boolean, gradient: Boolean) {
+        val h = height.toFloat()
+        val segs = 14
+        val segH = h / segs
+        val padY = segH * 0.20f
+        var x = 0f
+        for (i in 0 until BARS) {
+            val lit = (current[i] * segs).toInt().coerceIn(0, segs)
+            for (sIdx in 0 until lit) {
+                if (reactive != 0) barPaint.color = reactiveColors[i]
+                else if (gradient) barPaint.color = sampleRamp(palette, sIdx / segs.toFloat())
+                val top = h - (sIdx + 1) * segH + padY
+                barRect.set(x, top, x + barWidth, top + segH - padY * 2)
+                canvas.drawRoundRect(barRect, corner * 0.4f, corner * 0.4f, barPaint)
+                if (reflect && sIdx < 4) {
+                    val a = barPaint.alpha
+                    barPaint.alpha = 40
+                    val ry = (sIdx + 1) * segH - padY
+                    barRect.set(x, ry - segH + padY * 2, x + barWidth, ry)
+                    canvas.drawRoundRect(barRect, corner * 0.4f, corner * 0.4f, barPaint)
+                    barPaint.alpha = a
+                }
+            }
+            x += barWidth + gap
+        }
+        if (gradient && reactive == 0) rebuildShader()
+    }
+
+    /** Arcoiris horizontal: cada barra un color fijo del circulo cromatico. */
+    private fun drawRainbow(canvas: Canvas) {
+        val h = height.toFloat()
+        val minH = h * 0.06f
+        var x = 0f
+        barPaint.shader = null
+        for (i in 0 until BARS) {
+            val hue = i / BARS.toFloat() * 300f
+            barPaint.color = android.graphics.Color.HSVToColor(floatArrayOf(hue, 0.85f, 1f))
+            if (neon) barPaint.setShadowLayer(barWidth * 0.8f, 0f, 0f, barPaint.color)
+            val bh = max(minH, current[i] * h)
+            barRect.set(x, h - bh, x + barWidth, h)
+            canvas.drawRoundRect(barRect, corner, corner, barPaint)
+            x += barWidth + gap
+        }
+        rebuildShader()
+    }
+
+    /** Onda rellena hacia abajo: contorno del espectro relleno. */
+    private fun drawFilled(canvas: Canvas) {
+        val h = height.toFloat()
+        val w = width.toFloat()
+        val step = w / (BARS - 1)
+        wavePath.reset()
+        wavePath.moveTo(0f, h)
+        wavePath.lineTo(0f, h - current[0] * h)
+        for (i in 1 until BARS) {
+            val px = i * step
+            val py = h - current[i] * h
+            val prevX = (i - 1) * step
+            val prevY = h - current[i - 1] * h
+            wavePath.quadTo(prevX, prevY, (prevX + px) / 2f, (prevY + py) / 2f)
+        }
+        wavePath.lineTo(w, h - current[BARS - 1] * h)
+        wavePath.lineTo(w, h)
+        wavePath.close()
+        val old = barPaint.style
+        barPaint.style = Paint.Style.FILL
+        if (reactive != 0) barPaint.color = reactiveColors[BARS / 2]
+        canvas.drawPath(wavePath, barPaint)
+        barPaint.style = old
+    }
+
+    /** Puntos grid: matriz de circulos que se encienden por columna. */
+    private fun drawDotGrid(canvas: Canvas) {
+        val h = height.toFloat()
+        val rows = 10
+        val rowH = h / rows
+        val radius = barWidth * 0.30f
+        var x = barWidth / 2f
+        for (i in 0 until BARS) {
+            val lit = (current[i] * rows).toInt().coerceIn(0, rows)
+            for (r in 0 until rows) {
+                val cy = h - (r + 0.5f) * rowH
+                if (r < lit) {
+                    if (reactive != 0) barPaint.color = reactiveColors[i]
+                    barPaint.alpha = 255
+                } else {
+                    barPaint.color = 0xFF1B2530.toInt()
+                    barPaint.alpha = 120
+                }
+                canvas.drawCircle(x, cy, radius, barPaint)
+            }
+            barPaint.alpha = 255
+            x += barWidth + gap
+        }
+        if (reactive == 0) rebuildShader()
+    }
+
+    /** Llamas: columnas tipo fuego que se afinan hacia la punta. */
+    private fun drawFlames(canvas: Canvas) {
+        val h = height.toFloat()
+        val minH = h * 0.05f
+        var x = 0f
+        val old = barPaint.style
+        barPaint.style = Paint.Style.FILL
+        for (i in 0 until BARS) {
+            if (reactive != 0) barPaint.color = reactiveColors[i]
+            val bh = max(minH, current[i] * h)
+            val topY = h - bh
+            wavePath.reset()
+            wavePath.moveTo(x, h)
+            wavePath.lineTo(x + barWidth, h)
+            wavePath.lineTo(x + barWidth * 0.72f, topY + bh * 0.15f)
+            wavePath.quadTo(x + barWidth * 0.5f, topY - bh * 0.08f, x + barWidth * 0.28f, topY + bh * 0.15f)
+            wavePath.close()
+            if (neon && reactive != 0) barPaint.setShadowLayer(barWidth, 0f, 0f, reactiveColors[i])
+            canvas.drawPath(wavePath, barPaint)
+            x += barWidth + gap
+        }
+        barPaint.style = old
+    }
+
+    /** Ondas latido: circulos concentricos que laten con el volumen global. */
+    private fun drawPulse(canvas: Canvas) {
+        var energy = 0f
+        for (i in 0 until BARS) energy += current[i]
+        energy /= BARS
+        val cxp = width / 2f
+        val cyp = height / 2f
+        val maxR = kotlin.math.min(width, height) * 0.48f
+        val old = barPaint.style
+        barPaint.style = Paint.Style.STROKE
+        barPaint.strokeWidth = kotlin.math.max(3f, maxR * 0.02f)
+        val rings = 5
+        for (r in 0 until rings) {
+            val phase = r / rings.toFloat()
+            val radius = (maxR * (phase + energy * 0.5f)) % maxR
+            barPaint.color = if (reactive != 0) reactiveColors[(r * BARS / rings).coerceIn(0, BARS - 1)]
+                             else sampleRamp(palette, phase)
+            barPaint.alpha = (255 * (1f - radius / maxR)).toInt().coerceIn(30, 255)
+            if (neon) barPaint.setShadowLayer(barPaint.strokeWidth * 3f, 0f, 0f, barPaint.color)
+            canvas.drawCircle(cxp, cyp, radius, barPaint)
+        }
+        barPaint.alpha = 255
+        barPaint.style = old
+        if (reactive == 0) rebuildShader()
     }
 
     /**
@@ -535,35 +839,6 @@ class AudioVisualizerView @JvmOverloads constructor(
         }
     }
 
-    /**
-     * Bloques: cada barra es una pila de segmentos separados, como un ecualizador
-     * de LEDs clasico. El segmento de arriba parpadea segun el pico.
-     */
-    private fun drawBlocks(canvas: Canvas) {
-        val h = height.toFloat()
-        val segs = 12
-        val segH = h / segs
-        val padY = segH * 0.22f
-        var x = 0f
-        for (i in 0 until BARS) {
-            if (reactive != 0) {
-                barPaint.color = reactiveColors[i]
-                if (neon) barPaint.setShadowLayer(barWidth * 0.7f, 0f, 0f, reactiveColors[i])
-            }
-            val lit = (current[i] * segs).toInt().coerceIn(0, segs)
-            for (sIdx in 0 until lit) {
-                val top = h - (sIdx + 1) * segH + padY
-                barRect.set(x, top, x + barWidth, top + segH - padY * 2)
-                canvas.drawRoundRect(barRect, corner * 0.5f, corner * 0.5f, barPaint)
-            }
-            x += barWidth + gap
-        }
-    }
-
-    /**
-     * Linea: una sola linea continua que recorre el ancho siguiendo el espectro,
-     * mas sobria. Reutiliza el Path de la onda.
-     */
     private fun drawLine(canvas: Canvas) {
         val h = height.toFloat()
         val w = width.toFloat()

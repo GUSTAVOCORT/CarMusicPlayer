@@ -26,6 +26,8 @@ object PlaybackStore {
     private const val K_CLOCK = "clock_pos"
     private const val K_NEON = "neon"
     private const val K_AUTO_COLOR = "auto_color"
+    private const val K_AUTO_STYLE = "auto_style"
+    private const val K_BLINK = "neon_blink"
 
     const val SOURCE_ALL = "ALL"
 
@@ -127,7 +129,19 @@ object PlaybackStore {
         prefs(c).edit().putBoolean(K_AUTO_COLOR, on).apply()
     }
 
-    /** Estilo del visualizador: 0 barras, 1 onda, 2 circulo. */
+    /** Alternar el estilo del visualizador con cada cancion. */
+    fun autoStyle(c: Context): Boolean = prefs(c).getBoolean(K_AUTO_STYLE, false)
+    fun setAutoStyle(c: Context, on: Boolean) {
+        prefs(c).edit().putBoolean(K_AUTO_STYLE, on).apply()
+    }
+
+    /** Titileo del neon tipo letrero en los textos. */
+    fun blink(c: Context): Boolean = prefs(c).getBoolean(K_BLINK, false)
+    fun setBlink(c: Context, on: Boolean) {
+        prefs(c).edit().putBoolean(K_BLINK, on).apply()
+    }
+
+    /** Estilo del visualizador. */
     fun visualStyle(c: Context): Int = prefs(c).getInt(K_VIS_STYLE, 0)
 
     fun setVisualStyle(c: Context, style: Int) {

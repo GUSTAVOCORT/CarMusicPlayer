@@ -56,7 +56,7 @@ import java.util.Locale
 class MainActivity : AppCompatActivity() {
 
     private companion object {
-        const val APP_VERSION = "v5.2"
+        const val APP_VERSION = "v5.4"
         // El canal Binder entre pantalla y servicio revienta pasado ~1 MB por
         // transaccion. 400 pistas entran holgadas: son casi 24 horas de musica.
         const val MAX_QUEUE = 400
@@ -192,6 +192,7 @@ class MainActivity : AppCompatActivity() {
         applyBackground()
         applyClock()
         applyNeon(PlaybackStore.neon(this))
+        applyBlink()
 
         wireControls()
         requestPermissions()
@@ -257,56 +258,32 @@ class MainActivity : AppCompatActivity() {
     private fun cycleStyle() {
         val applied = b.visualizer.setStyle(b.visualizer.currentStyle() + 1)
         PlaybackStore.setVisualStyle(this, applied)
-        val name = when (applied) {
-            AudioVisualizerView.STYLE_WAVE -> getString(R.string.style_wave)
-            AudioVisualizerView.STYLE_CIRCLE -> getString(R.string.style_circle)
-            AudioVisualizerView.STYLE_DOTS -> getString(R.string.style_dots)
-            AudioVisualizerView.STYLE_MIRROR -> getString(R.string.style_mirror)
-            AudioVisualizerView.STYLE_BLOCKS -> getString(R.string.style_blocks)
-            AudioVisualizerView.STYLE_LINE -> getString(R.string.style_line)
-            else -> getString(R.string.style_bars)
-        }
+        val name = getString(R.string.style_prefix) + " " + styleName(applied)
         Toast.makeText(this, name, Toast.LENGTH_SHORT).show()
     }
 
-    private fun cyclePalette() {
-        val next = (PlaybackStore.palette(this) + 1) % Palettes.ALL.size
-        PlaybackStore.setPalette(this, next)
-        applyPalette(next)
-        Toast.makeText(this, Palettes.get(next).name, Toast.LENGTH_SHORT).show()
-    }
-
-    private fun cycleScreenMode() {
-        applyScreenMode((screenMode + 1) % 3, announce = true)
-    }
-
-    private fun applyScreenMode(mode: Int, announce: Boolean) {
-        if (!setsReady) return
-        screenMode = mode
-        // applyTo directo, sin TransitionManager: una animacion de layout en el T3
-        // costaria mas que todo el resto de la pantalla junta.
-        when (mode) {
-            1 -> setWide.applyTo(b.root)
-            2 -> setFull.applyTo(b.root)
-            else -> setNormal.applyTo(b.root)
-        }
-        PlaybackStore.setScreenMode(this, mode)
-        b.coverBackground.visibility =
-            if (mode == 2 && b.coverBackground.drawable != null) View.VISIBLE else View.GONE
-        // El fondo del usuario NO depende del modo: se mantiene en las 3 vistas.
-        // Los ConstraintSet lo habrian ocultado, asi que lo reafirmamos aca.
-        val hasBg = b.appBackground.drawable != null
-        b.appBackground.visibility = if (hasBg) View.VISIBLE else View.GONE
-        b.scrim.visibility = if (hasBg) View.VISIBLE else View.GONE
-        applyClock()
-        if (announce) {
-            val name = when (mode) {
-                1 -> R.string.mode_wide
-                2 -> R.string.mode_full
-                else -> R.string.mode_normal
-            }
-            Toast.makeText(this, name, Toast.LENGTH_SHORT).show()
-        }
+    private fun styleName(st: Int): String = when (st) {
+        AudioVisualizerView.STYLE_LED_SEG -> "Segmentos LED"
+        AudioVisualizerView.STYLE_BARS -> "Barras"
+        AudioVisualizerView.STYLE_MIRROR -> "Espejo"
+        AudioVisualizerView.STYLE_LINE -> "Linea"
+        AudioVisualizerView.STYLE_DOTS -> "Puntos"
+        AudioVisualizerView.STYLE_FILLED -> "Onda rellena"
+        AudioVisualizerView.STYLE_PEAK -> "Barras con pico"
+        AudioVisualizerView.STYLE_LED_FLAT -> "LED plano"
+        AudioVisualizerView.STYLE_RAINBOW -> "Arcoiris"
+        AudioVisualizerView.STYLE_RADIAL -> "Radial circular"
+        AudioVisualizerView.STYLE_MATRIX -> "Matriz LED"
+        AudioVisualizerView.STYLE_DOTGRID -> "Puntos grid"
+        AudioVisualizerView.STYLE_WAVE_MIRROR -> "Onda espejo"
+        AudioVisualizerView.STYLE_CENTER -> "Barras centro"
+        AudioVisualizerView.STYLE_FLAMES -> "Llamas"
+        AudioVisualizerView.STYLE_PULSE -> "Ondas latido"
+        AudioVisualizerView.STYLE_WATER -> "Ondas de agua"
+        AudioVisualizerView.STYLE_STARS -> "Estrellas"
+        AudioVisualizerView.STYLE_SPIRAL -> "Espiral"
+        AudioVisualizerView.STYLE_PARTICLES -> "Particulas"
+        else -> "Barras"
     }
 
     override fun onStart() {
@@ -729,14 +706,15 @@ class MainActivity : AppCompatActivity() {
     // ------------------------------------------------------------------ Ajustes de pantalla
 
     private fun showSettingsDialog() {
-        val autoOn = PlaybackStore.autoColor(this)
-        val autoLabel = getString(R.string.set_autocolor) +
-            "  [" + getString(if (autoOn) R.string.on else R.string.off) + "]"
+        fun sw(res: Int, on: Boolean) =
+            getString(res) + "  [" + getString(if (on) R.string.on else R.string.off) + "]"
         val options = arrayOf(
             getString(R.string.set_background),
             getString(R.string.set_clock),
-            getString(R.string.set_neon),
-            autoLabel
+            sw(R.string.set_neon, PlaybackStore.neon(this)),
+            sw(R.string.set_autocolor, PlaybackStore.autoColor(this)),
+            sw(R.string.set_autostyle, PlaybackStore.autoStyle(this)),
+            sw(R.string.set_blink, PlaybackStore.blink(this))
         )
         AlertDialog.Builder(this)
             .setTitle(R.string.settings_title)
@@ -746,6 +724,8 @@ class MainActivity : AppCompatActivity() {
                     1 -> showClockDialog()
                     2 -> toggleNeon()
                     3 -> toggleAutoColor()
+                    4 -> toggleAutoStyle()
+                    5 -> toggleBlink()
                 }
             }
             .show()
@@ -977,10 +957,50 @@ class MainActivity : AppCompatActivity() {
         ).show()
     }
 
+    private fun toggleAutoStyle() {
+        val on = !PlaybackStore.autoStyle(this)
+        PlaybackStore.setAutoStyle(this, on)
+        Toast.makeText(this, getString(R.string.set_autostyle) + ": " +
+            getString(if (on) R.string.on else R.string.off), Toast.LENGTH_SHORT).show()
+    }
+
+    private fun toggleBlink() {
+        val on = !PlaybackStore.blink(this)
+        PlaybackStore.setBlink(this, on)
+        applyBlink()
+        Toast.makeText(this, getString(R.string.set_blink) + ": " +
+            getString(if (on) R.string.on else R.string.off), Toast.LENGTH_SHORT).show()
+    }
+
+    /** Titileo tipo letrero de neon en el titulo. */
+    private var blinkOn = true
+    private val blinkTick = object : Runnable {
+        override fun run() {
+            if (!PlaybackStore.blink(this@MainActivity) || !PlaybackStore.neon(this@MainActivity)) {
+                b.txtTitle.alpha = 1f
+                return
+            }
+            blinkOn = !blinkOn
+            // Titileo sutil e irregular, como un cartel viejo
+            b.txtTitle.alpha = if (blinkOn) 1f else 0.55f
+            ui.postDelayed(this, if (blinkOn) 1400L else 120L)
+        }
+    }
+
+    private fun applyBlink() {
+        ui.removeCallbacks(blinkTick)
+        if (PlaybackStore.blink(this) && PlaybackStore.neon(this)) {
+            ui.post(blinkTick)
+        } else {
+            b.txtTitle.alpha = 1f
+        }
+    }
+
     private fun toggleNeon() {
         val on = !PlaybackStore.neon(this)
         PlaybackStore.setNeon(this, on)
         applyNeon(on)
+        applyBlink()
         if (on) Toast.makeText(this, R.string.neon_warn, Toast.LENGTH_LONG).show()
     }
 
@@ -1130,6 +1150,11 @@ class MainActivity : AppCompatActivity() {
                 val next = (PlaybackStore.palette(this@MainActivity) + 1) % Palettes.ALL.size
                 PlaybackStore.setPalette(this@MainActivity, next)
                 applyPalette(next)
+            }
+            // Estilos automaticos: cada cancion estrena efecto
+            if (PlaybackStore.autoStyle(this@MainActivity) && mediaItem != null) {
+                val applied = b.visualizer.setStyle(b.visualizer.currentStyle() + 1)
+                PlaybackStore.setVisualStyle(this@MainActivity, applied)
             }
         }
     }

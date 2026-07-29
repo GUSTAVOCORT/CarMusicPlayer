@@ -56,7 +56,7 @@ import java.util.Locale
 class MainActivity : AppCompatActivity() {
 
     private companion object {
-        const val APP_VERSION = "v5.4"
+        const val APP_VERSION = "v5.4.1"
         // El canal Binder entre pantalla y servicio revienta pasado ~1 MB por
         // transaccion. 400 pistas entran holgadas: son casi 24 horas de musica.
         const val MAX_QUEUE = 400
@@ -253,6 +253,39 @@ class MainActivity : AppCompatActivity() {
             it.setVisibility(R.id.scrim, bgVis)
         }
         setsReady = true
+    }
+
+    private fun cycleScreenMode() {
+        applyScreenMode((screenMode + 1) % 3, announce = true)
+    }
+
+    private fun cyclePalette() {
+        val next = (PlaybackStore.palette(this) + 1) % Palettes.ALL.size
+        PlaybackStore.setPalette(this, next)
+        applyPalette(next)
+        Toast.makeText(this, Palettes.get(next).name, Toast.LENGTH_SHORT).show()
+    }
+
+    private fun applyScreenMode(mode: Int, announce: Boolean) {
+        if (!setsReady) return
+        screenMode = mode
+        when (mode) {
+            1 -> setWide.applyTo(b.root)
+            2 -> setFull.applyTo(b.root)
+            else -> setNormal.applyTo(b.root)
+        }
+        PlaybackStore.setScreenMode(this, mode)
+        b.coverBackground.visibility =
+            if (mode == 2 && b.coverBackground.drawable != null) View.VISIBLE else View.GONE
+        applyClock()
+        if (announce) {
+            val name = when (mode) {
+                1 -> R.string.mode_wide
+                2 -> R.string.mode_full
+                else -> R.string.mode_normal
+            }
+            Toast.makeText(this, name, Toast.LENGTH_SHORT).show()
+        }
     }
 
     private fun cycleStyle() {
